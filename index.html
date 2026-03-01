@@ -1248,9 +1248,9 @@ function buildSection(sec,who) {
   const tc=sec.type==='savings'?'var(--pos)':sec.type==='income'?'var(--brand)':'var(--txt)';
   const shell=buildSec(sec.label,fmt(total),tc,sec.id,who);
   const body=shell.querySelector('.sec-body'); openSec(shell);
-  const COLS='1fr 100px 88px 44px 90px 90px 80px 22px';
+  const COLS='1fr 130px 100px 88px 44px 90px 90px 80px 22px';
   const hd=document.createElement('div'); hd.className='col-hd'; hd.style.gridTemplateColumns=COLS;
-  hd.innerHTML='<div>Name / Vendor</div><div style="text-align:center">Joint Split</div><div>Frequency</div><div style="text-align:right">Due</div><div style="text-align:right">Cost</div><div>Comment</div><div>Website</div><div></div>';
+  hd.innerHTML='<div>Name / Vendor</div><div>Category</div><div style="text-align:center">Joint Split</div><div>Frequency</div><div style="text-align:right">Due</div><div style="text-align:right">Cost</div><div>Comment</div><div>Website</div><div></div>';
   body.appendChild(hd);
   const rw=document.createElement('div'); rw.id='rw-'+sec.id; body.appendChild(rw);
   sec.rows.forEach(r=>rw.appendChild(buildRow(r,sec,who)));
@@ -1266,6 +1266,40 @@ function buildSection(sec,who) {
 }
 
 
+
+function moveRow(fromSecId, rowId, toSecId, who) {
+  const fromSec = S[who].sections.find(s=>s.id===fromSecId);
+  const toSec   = S[who].sections.find(s=>s.id===toSecId);
+  if(!fromSec||!toSec||fromSecId===toSecId) return;
+  const ri = fromSec.rows.findIndex(r=>r.id===rowId);
+  if(ri===-1) return;
+  const [row] = fromSec.rows.splice(ri,1);
+  toSec.rows.push(row);
+  // Rebuild both sections visually
+  updateSecTot(fromSecId,who);
+  updateSecTot(toSecId,who);
+  updateEbar(who);
+  renderJoint();
+  dirty(true);
+  // Re-render the row in its new section
+  const newSecEl = document.getElementById('sec-'+toSecId);
+  if(newSecEl){
+    const body = newSecEl.querySelector('.sec-body');
+    const addBtn = body && body.querySelector('.add-row');
+    const newRowEl = buildRow(row, toSec, who);
+    if(body && addBtn) body.insertBefore(newRowEl, addBtn);
+    else if(body) body.appendChild(newRowEl);
+  }
+  // Remove old row element
+  const oldRowEl = document.getElementById('row-'+rowId);
+  if(oldRowEl) oldRowEl.remove();
+  // Update section totals display
+  const fromSecEl = document.getElementById('sec-'+fromSecId);
+  if(fromSecEl){
+    const tot = fromSecEl.querySelector('.sec-tot');
+    if(tot) tot.textContent = fmt(fromSec.rows.reduce((s,r)=>s+effCost(r,who),0));
+  }
+}
 function buildDueDateField(container, r, sec, who) {
   const freq = r.frequency || 'Monthly';
   const MONTHS_S = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -1335,7 +1369,7 @@ function buildDueDateField(container, r, sec, who) {
 }
 
 function buildRow(r,sec,who) {
-  const COLS = '1fr 100px 88px 44px 90px 90px 80px 22px';
+  const COLS = '1fr 130px 100px 88px 44px 90px 90px 80px 22px';
   const row = document.createElement('div'); row.className='drow'; row.id='row-'+r.id;
   row.style.gridTemplateColumns = COLS;
 
@@ -1377,10 +1411,25 @@ function buildRow(r,sec,who) {
   wi.style.fontSize='11.5px';
   wi.oninput = function(){ updRow(sec.id,r.id,who,'website',this.value); }; wf.appendChild(wi);
 
+  // Section selector
+  const sw = document.createElement('div'); sw.className='fi';
+  const ss = document.createElement('select');
+  ss.style.cssText='font-size:11.5px;font-weight:500;width:100%';
+  ss.title='Move to category';
+  // Populate with all expense sections for this person
+  S[who].sections.filter(s=>s.type==='expense').forEach(s=>{
+    const o=document.createElement('option');
+    o.value=s.id; o.textContent=s.label;
+    if(s.id===sec.id) o.selected=true;
+    ss.appendChild(o);
+  });
+  ss.onchange=function(){ moveRow(sec.id,r.id,this.value,who); };
+  sw.appendChild(ss);
+
   const xb = document.createElement('button'); xb.className='xbtn'; xb.textContent='✕';
   xb.onclick = function(){ rmRow(sec.id,r.id,who); };
 
-  [lw,jw,ff,df,cf,cmf,wf,xb].forEach(e=>row.appendChild(e));
+  [lw,sw,jw,ff,df,cf,cmf,wf,xb].forEach(e=>row.appendChild(e));
   return row;
 }
 
