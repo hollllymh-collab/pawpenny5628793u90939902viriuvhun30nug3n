@@ -392,6 +392,24 @@ button,input,select,textarea{font-family:'Inter',sans-serif;letter-spacing:-.01e
 .pg-title img{height:28px;object-fit:contain;opacity:.8;flex-shrink:0}
 .pg-title-name{font-size:22px;font-weight:800;letter-spacing:-.04em}
 .pg-title-sub{font-size:12px;color:var(--txt3);margin-top:1px}
+
+/* ── SECTION MODAL ── */
+.sec-modal-overlay{position:fixed;inset:0;background:rgba(26,24,20,.45);z-index:500;
+  display:flex;align-items:center;justify-content:center;padding:20px}
+.sec-modal{background:var(--white);border-radius:12px;padding:24px;width:100%;max-width:360px;
+  box-shadow:0 8px 40px rgba(26,24,20,.18);border:1.5px solid var(--border)}
+.sec-modal-title{font-size:16px;font-weight:800;letter-spacing:-.02em;color:var(--txt);margin-bottom:16px}
+.sec-modal input{width:100%;padding:10px 14px;border:1.5px solid var(--border2);border-radius:8px;
+  font-size:14px;font-family:inherit;color:var(--txt);background:var(--white);outline:none;margin-bottom:12px}
+.sec-modal input:focus{border-color:var(--brand)}
+.sec-modal-types{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.sec-type-btn{padding:10px;border-radius:8px;border:1.5px solid var(--border);background:var(--white);
+  font-size:12.5px;font-weight:600;color:var(--txt3);cursor:pointer;transition:.15s;text-align:center}
+.sec-type-btn.active{border-color:var(--brand);background:var(--brand-l);color:var(--brand2)}
+.sec-modal-btns{display:flex;gap:8px}
+.sec-modal-btns .bsave{flex:1}
+.sec-modal-cancel{flex:1;padding:10px;border-radius:8px;border:1.5px solid var(--border);
+  background:none;font-size:13px;font-weight:600;color:var(--txt3);cursor:pointer}
 </style>
 </head>
 <body>
@@ -520,7 +538,7 @@ button,input,select,textarea{font-family:'Inter',sans-serif;letter-spacing:-.01e
           <div>Expense</div><div style="text-align:right">Split</div>
           <div style="text-align:right;color:var(--holly)">Holly</div>
           <div style="text-align:right;color:var(--berta)">Berta</div>
-          <div style="text-align:right">Total</div><div style="text-align:right">Due</div>
+          <div style="text-align:right">Total</div><div style="text-align:center">Due Date</div>
         </div>
         <div id="jd-rows"></div>
       </div>
@@ -1248,9 +1266,9 @@ function buildSection(sec,who) {
   const tc=sec.type==='savings'?'var(--pos)':sec.type==='income'?'var(--brand)':'var(--txt)';
   const shell=buildSec(sec.label,fmt(total),tc,sec.id,who);
   const body=shell.querySelector('.sec-body'); openSec(shell);
-  const COLS='1fr 130px 100px 88px 44px 90px 90px 80px 22px';
+  const COLS='1fr 130px 100px 88px 90px 90px 90px 80px 22px';
   const hd=document.createElement('div'); hd.className='col-hd'; hd.style.gridTemplateColumns=COLS;
-  hd.innerHTML='<div>Name / Vendor</div><div>Category</div><div style="text-align:center">Joint Split</div><div>Frequency</div><div style="text-align:right">Due</div><div style="text-align:right">Cost</div><div>Comment</div><div>Website</div><div></div>';
+  hd.innerHTML='<div>Name / Vendor</div><div>Category</div><div style="text-align:center">Joint Split</div><div>Frequency</div><div style="text-align:center">Due Date</div><div style="text-align:right">Cost</div><div>Comment</div><div>Website</div><div></div>';
   body.appendChild(hd);
   const rw=document.createElement('div'); rw.id='rw-'+sec.id; body.appendChild(rw);
   sec.rows.forEach(r=>rw.appendChild(buildRow(r,sec,who)));
@@ -1307,12 +1325,12 @@ function buildDueDateField(container, r, sec, who) {
   if(freq==='One-time' || freq==='') {
     // Month + Day picker for one-time
     const msel = document.createElement('select');
-    msel.style.cssText='font-size:11px;width:44px;text-align:center';
+    msel.style.cssText='font-size:11px;width:46px';
     MONTHS_S.forEach((m,i)=>{ const o=document.createElement('option'); o.value=i+1; o.textContent=m;
       if(r.dueDay && r.dueDay.includes('/') && parseInt(r.dueDay.split('/')[0])===i+1) o.selected=true;
       msel.appendChild(o); });
     const dsel = document.createElement('select');
-    dsel.style.cssText='font-size:11px;width:36px;text-align:center';
+    dsel.style.cssText='font-size:11px;width:34px';
     for(let d=1;d<=31;d++){ const o=document.createElement('option'); o.value=d; o.textContent=d;
       if(r.dueDay && r.dueDay.includes('/') && parseInt(r.dueDay.split('/')[1])===d) o.selected=true;
       dsel.appendChild(o); }
@@ -1323,12 +1341,12 @@ function buildDueDateField(container, r, sec, who) {
   } else if(freq==='Annually' || freq==='Every 6 months' || freq==='Quarterly') {
     // Month + Day for annual/semi-annual
     const msel = document.createElement('select');
-    msel.style.cssText='font-size:11px;width:44px;text-align:center';
+    msel.style.cssText='font-size:11px;width:46px';
     MONTHS_S.forEach((m,i)=>{ const o=document.createElement('option'); o.value=i+1; o.textContent=m;
       if(r.dueDay && r.dueDay.includes('/') && parseInt(r.dueDay.split('/')[0])===i+1) o.selected=true;
       msel.appendChild(o); });
     const dsel = document.createElement('select');
-    dsel.style.cssText='font-size:11px;width:36px;text-align:center';
+    dsel.style.cssText='font-size:11px;width:34px';
     for(let d=1;d<=31;d++){ const o=document.createElement('option'); o.value=d; o.textContent=d;
       if(r.dueDay && r.dueDay.includes('/') && parseInt(r.dueDay.split('/')[1])===d) o.selected=true;
       dsel.appendChild(o); }
@@ -1369,7 +1387,7 @@ function buildDueDateField(container, r, sec, who) {
 }
 
 function buildRow(r,sec,who) {
-  const COLS = '1fr 130px 100px 88px 44px 90px 90px 80px 22px';
+  const COLS = '1fr 130px 100px 88px 90px 90px 90px 80px 22px';
   const row = document.createElement('div'); row.className='drow'; row.id='row-'+r.id;
   row.style.gridTemplateColumns = COLS;
 
@@ -1388,10 +1406,16 @@ function buildRow(r,sec,who) {
   const fs = document.createElement('select'); fs.style.cssText='text-align:left;font-size:12px';
   FREQS.forEach(f=>{ const o=document.createElement('option'); o.value=f; o.textContent=f; if(r.frequency===f) o.selected=true; fs.appendChild(o); });
   fs.onchange = function(){
-    updRow(sec.id,r.id,who,'frequency',this.value);
-    // Rebuild due date field for new frequency
-    const ddf=document.getElementById('ddf-'+r.id);
-    if(ddf){ ddf.innerHTML=''; buildDueDateField(ddf,r,sec,who); }
+    const newFreq = this.value;
+    updRow(sec.id,r.id,who,'frequency',newFreq);
+    updRow(sec.id,r.id,who,'dueDay','');
+    const freshSec = S[who].sections.find(s=>s.id===sec.id);
+    const freshRow = freshSec && freshSec.rows.find(x=>x.id===r.id);
+    const ddf = document.getElementById('ddf-'+r.id);
+    if(ddf && freshRow){
+      while(ddf.firstChild) ddf.removeChild(ddf.firstChild);
+      buildDueDateField(ddf, freshRow, freshSec, who);
+    }
   }; ff.appendChild(fs);
 
   const df = document.createElement('div'); df.className='fi'; df.id='ddf-'+r.id;
@@ -1661,9 +1685,15 @@ function rmPC(id,who){S[who].paychecks=S[who].paychecks.filter(p=>p.id!==id);con
 function updRow(secId,rowId,who,f,v){const sec=S[who].sections.find(s=>s.id===secId);if(!sec)return;const r=sec.rows.find(x=>x.id===rowId);if(!r)return;r[f]=v;updateSecTot(secId,who);updateEbar(who);if(['isJoint','jointPct','cost'].includes(f))renderJoint();dirty(true);}
 function updateSecTot(secId,who){const sec=S[who].sections.find(s=>s.id===secId);if(!sec)return;const t=sec.rows.reduce((s,r)=>s+effCost(r,who),0);const tc=sec.type==='savings'?'var(--pos)':sec.type==='income'?'var(--brand)':'var(--txt)';const te=document.getElementById('st-'+secId);if(te){const cells=te.querySelectorAll('div');if(cells[4])cells[4].textContent=fmt(t);}const se=document.getElementById('sec-'+secId);if(se){const tt=se.querySelector('.sec-tot');if(tt)tt.textContent=fmt(t);}}
 function rmRow(secId,rowId,who){const sec=S[who].sections.find(s=>s.id===secId);if(!sec)return;sec.rows=sec.rows.filter(r=>r.id!==rowId);const e=document.getElementById('row-'+rowId);if(e)e.remove();updateSecTot(secId,who);updateEbar(who);renderJoint();dirty(true);}
-function renameSec(secId,who){const sec=S[who].sections.find(s=>s.id===secId);if(!sec)return;const nm=prompt('Section name:',sec.label);if(!nm)return;sec.label=nm;const e=document.getElementById('sec-'+secId);if(e){const t=e.querySelector('.sec-ttl');if(t)t.textContent=nm;}dirty(true);}
+function renameSec(secId,who){
+  const sec=S[who].sections.find(s=>s.id===secId);
+  if(!sec) return;
+  openSectionModal('rename', who, secId, sec.label, sec.type);
+}
 function rmSec(secId,who){if(!confirm('Remove this section?'))return;S[who].sections=S[who].sections.filter(s=>s.id!==secId);const e=document.getElementById('sec-'+secId);if(e)e.remove();updateEbar(who);dirty(true);}
-function addSection(who){const label=prompt('Section name:');if(!label)return;const t=prompt('Type (expense/income):','expense')||'expense';const sec={id:uid(),label,type:t,rows:[]};S[who].sections.push(sec);const el=document.getElementById(who+'-entry');const ab=el&&el.querySelector('[onclick*="addSection"]');if(el)el.insertBefore(buildSection(sec,who),ab||null);dirty(true);}
+function addSection(who){
+  openSectionModal('add', who, null);
+}
 function updSav(id,who,f,v){const r=S[who].savingsRows.find(x=>x.id===id);if(!r)return;r[f]=v;updateSavTot(who);updateEbar(who);dirty(true);}
 function updateSavTot(who){
   const p=S[who], k401=get401k(p), manualTotal=totalSavOOC(p), grandTotal=k401+manualTotal;
@@ -1786,6 +1816,103 @@ function openSec(shell){const hd=shell.querySelector('.sec-hd'),b=shell.querySel
 function dirty(d){S.dirty=d;const dot=document.getElementById('sdot');if(dot)dot.className='sdot'+(d?' dirty':'');const txt=document.getElementById('stxt');if(txt)txt.textContent=d?'Unsaved changes':'All saved';const btn=document.getElementById('sbtn');if(btn)btn.disabled=!d;}
 function toast(type,msg){const t=document.getElementById('toast');const ti=document.getElementById('ti');const tm=document.getElementById('tm');if(!t||!ti||!tm)return;tm.textContent=msg;ti.innerHTML=type==='ok'?'&#10003;':'&#10007;';t.className='toast '+type+' on';setTimeout(()=>t.classList.remove('on'),3200);}
 
+
+
+// ── Section modal ──────────────────────────────────────────────
+let _secModalCb = null;
+let _secModalType = 'expense';
+
+function setSectionType(t){
+  _secModalType = t;
+  document.querySelectorAll('.sec-type-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.type===t);
+  });
+}
+
+function openSectionModal(mode, who, secId, currentName='', currentType='expense'){
+  _secModalType = currentType || 'expense';
+  const modal  = document.getElementById('sec-modal');
+  const title  = document.getElementById('sec-modal-title');
+  const input  = document.getElementById('sec-modal-input');
+  const types  = document.getElementById('sec-modal-types');
+  const saveBtn= document.getElementById('sec-modal-save');
+
+  input.value = currentName || '';
+  setSectionType(_secModalType);
+
+  if(mode==='add'){
+    title.textContent  = 'New Section';
+    saveBtn.textContent= 'Add Section';
+    types.style.display= 'grid'; // show type picker for new sections
+    _secModalCb = ()=>{
+      const label = input.value.trim();
+      if(!label) return;
+      const sec={id:uid(),label,type:_secModalType,rows:[]};
+      S[who].sections.push(sec);
+      const el=document.getElementById(who+'-entry');
+      const ab=el&&el.querySelector('.add-sec-btn');
+      if(el) el.insertBefore(buildSection(sec,who), ab||null);
+      // Rebuild category dropdowns in all existing rows
+      rebuildCategorySelects(who);
+      dirty(true);
+      closeSectionModal();
+    };
+  } else {
+    title.textContent  = 'Rename Section';
+    saveBtn.textContent= 'Save';
+    types.style.display= 'none'; // can't change type on rename
+    _secModalCb = ()=>{
+      const label=input.value.trim();
+      if(!label) return;
+      const sec=S[who].sections.find(s=>s.id===secId);
+      if(!sec) return;
+      sec.label=label;
+      const e=document.getElementById('sec-'+secId);
+      if(e){ const t=e.querySelector('.sec-ttl'); if(t) t.textContent=label; }
+      // Rebuild category dropdowns so they show new name
+      rebuildCategorySelects(who);
+      dirty(true);
+      closeSectionModal();
+    };
+  }
+
+  modal.style.display='flex';
+  setTimeout(()=>input.focus(),50);
+  // Allow Enter key to confirm
+  input.onkeydown=e=>{ if(e.key==='Enter') confirmSectionModal(); if(e.key==='Escape') closeSectionModal(); };
+}
+
+function confirmSectionModal(){
+  if(_secModalCb) _secModalCb();
+}
+
+function closeSectionModal(){
+  document.getElementById('sec-modal').style.display='none';
+  _secModalCb=null;
+}
+
+// Rebuild all category selectors after section add/rename
+function rebuildCategorySelects(who){
+  const secs = S[who].sections.filter(s=>s.type==='expense');
+  document.querySelectorAll('[id^="sec-"]').forEach(secEl=>{
+    const secId = secEl.id.replace('sec-','');
+    const thisSec = S[who].sections.find(s=>s.id===secId);
+    if(!thisSec) return;
+    secEl.querySelectorAll('[id^="row-"]').forEach(rowEl=>{
+      const rowId = rowEl.id.replace('row-','');
+      const sel = rowEl.querySelector('select[title="Move to category"]');
+      if(!sel) return;
+      const curVal = sel.value;
+      sel.innerHTML='';
+      secs.forEach(s=>{
+        const o=document.createElement('option');
+        o.value=s.id; o.textContent=s.label;
+        if(s.id===curVal) o.selected=true;
+        sel.appendChild(o);
+      });
+    });
+  });
+}
 
 </script>
 </body>
