@@ -1057,8 +1057,9 @@ function renderDash(who) {
   // ── Spending by category ──────────────────────────────────────
   const catColors=['var(--brand)','var(--holly)','var(--berta)','var(--warn)','var(--txt2)','var(--txt3)','var(--pos)'];
   const catMap={};
+  const whoKey=who; // use person's name key for effCost
   p.sections.filter(s=>s.type==='expense').forEach((sec,i)=>{
-    const t=sec.rows.reduce((a,r)=>a+r.cost,0);
+    const t=sec.rows.reduce((a,r)=>a+effCost(r,whoKey),0);
     if(t>0) catMap[sec.label]={val:t,color:catColors[i%catColors.length]};
   });
 
@@ -1264,6 +1265,75 @@ function buildSection(sec,who) {
   return shell;
 }
 
+
+function buildDueDateField(container, r, sec, who) {
+  const freq = r.frequency || 'Monthly';
+  const MONTHS_S = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  if(freq==='One-time' || freq==='') {
+    // Month + Day picker for one-time
+    const msel = document.createElement('select');
+    msel.style.cssText='font-size:11px;width:44px;text-align:center';
+    MONTHS_S.forEach((m,i)=>{ const o=document.createElement('option'); o.value=i+1; o.textContent=m;
+      if(r.dueDay && r.dueDay.includes('/') && parseInt(r.dueDay.split('/')[0])===i+1) o.selected=true;
+      msel.appendChild(o); });
+    const dsel = document.createElement('select');
+    dsel.style.cssText='font-size:11px;width:36px;text-align:center';
+    for(let d=1;d<=31;d++){ const o=document.createElement('option'); o.value=d; o.textContent=d;
+      if(r.dueDay && r.dueDay.includes('/') && parseInt(r.dueDay.split('/')[1])===d) o.selected=true;
+      dsel.appendChild(o); }
+    const save=()=>updRow(sec.id,r.id,who,'dueDay',msel.value+'/'+dsel.value);
+    msel.onchange=save; dsel.onchange=save;
+    container.appendChild(msel); container.appendChild(dsel);
+
+  } else if(freq==='Annually' || freq==='Every 6 months' || freq==='Quarterly') {
+    // Month + Day for annual/semi-annual
+    const msel = document.createElement('select');
+    msel.style.cssText='font-size:11px;width:44px;text-align:center';
+    MONTHS_S.forEach((m,i)=>{ const o=document.createElement('option'); o.value=i+1; o.textContent=m;
+      if(r.dueDay && r.dueDay.includes('/') && parseInt(r.dueDay.split('/')[0])===i+1) o.selected=true;
+      msel.appendChild(o); });
+    const dsel = document.createElement('select');
+    dsel.style.cssText='font-size:11px;width:36px;text-align:center';
+    for(let d=1;d<=31;d++){ const o=document.createElement('option'); o.value=d; o.textContent=d;
+      if(r.dueDay && r.dueDay.includes('/') && parseInt(r.dueDay.split('/')[1])===d) o.selected=true;
+      dsel.appendChild(o); }
+    const save=()=>updRow(sec.id,r.id,who,'dueDay',msel.value+'/'+dsel.value);
+    msel.onchange=save; dsel.onchange=save;
+    container.appendChild(msel); container.appendChild(dsel);
+
+  } else if(freq==='Every 2 months' || freq==='Monthly') {
+    // Day of month picker 1-31
+    const dsel = document.createElement('select');
+    dsel.style.cssText='font-size:12px;width:58px;text-align:center';
+    const blank = document.createElement('option'); blank.value=''; blank.textContent='Day'; dsel.appendChild(blank);
+    for(let d=1;d<=31;d++){ const o=document.createElement('option'); o.value=d; o.textContent=''+d;
+      if(String(r.dueDay)===String(d)) o.selected=true;
+      dsel.appendChild(o); }
+    dsel.onchange=function(){ updRow(sec.id,r.id,who,'dueDay',this.value); };
+    container.appendChild(dsel);
+
+  } else if(freq==='Weekly' || freq==='Every 2 weeks' || freq==='Bi-weekly') {
+    // Day of week picker
+    const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const dsel = document.createElement('select');
+    dsel.style.cssText='font-size:11px;width:58px;text-align:center';
+    const blank = document.createElement('option'); blank.value=''; blank.textContent='Day'; dsel.appendChild(blank);
+    days.forEach(d=>{ const o=document.createElement('option'); o.value=d; o.textContent=d;
+      if(r.dueDay===d) o.selected=true; dsel.appendChild(o); });
+    dsel.onchange=function(){ updRow(sec.id,r.id,who,'dueDay',this.value); };
+    container.appendChild(dsel);
+
+  } else {
+    // Fallback: plain day number input
+    const di = document.createElement('input'); di.type='number'; di.min='1'; di.max='31';
+    di.value=r.dueDay||''; di.placeholder='Day';
+    di.style.cssText='text-align:center;font-size:12px;width:54px';
+    di.oninput=function(){ updRow(sec.id,r.id,who,'dueDay',this.value); };
+    container.appendChild(di);
+  }
+}
+
 function buildRow(r,sec,who) {
   const COLS = '1fr 100px 88px 44px 90px 90px 80px 22px';
   const row = document.createElement('div'); row.className='drow'; row.id='row-'+r.id;
@@ -1283,12 +1353,15 @@ function buildRow(r,sec,who) {
   const ff = document.createElement('div'); ff.className='fi';
   const fs = document.createElement('select'); fs.style.cssText='text-align:left;font-size:12px';
   FREQS.forEach(f=>{ const o=document.createElement('option'); o.value=f; o.textContent=f; if(r.frequency===f) o.selected=true; fs.appendChild(o); });
-  fs.onchange = function(){ updRow(sec.id,r.id,who,'frequency',this.value); }; ff.appendChild(fs);
+  fs.onchange = function(){
+    updRow(sec.id,r.id,who,'frequency',this.value);
+    // Rebuild due date field for new frequency
+    const ddf=document.getElementById('ddf-'+r.id);
+    if(ddf){ ddf.innerHTML=''; buildDueDateField(ddf,r,sec,who); }
+  }; ff.appendChild(fs);
 
-  const df = document.createElement('div'); df.className='fi';
-  const di = document.createElement('input'); di.type='text'; di.value=r.dueDay||''; di.placeholder='6';
-  di.style.cssText='text-align:center;font-size:12px;width:36px';
-  di.oninput = function(){ updRow(sec.id,r.id,who,'dueDay',this.value); }; df.appendChild(di);
+  const df = document.createElement('div'); df.className='fi'; df.id='ddf-'+r.id;
+  buildDueDateField(df, r, sec, who);
 
   const cf = document.createElement('div'); cf.className='fi';
   const cs = document.createElement('span'); cs.textContent='$'; cf.appendChild(cs);
@@ -1369,27 +1442,73 @@ function initSplitDrag(){
 }
 
 function buildSavingsSection(who){
-  const p=S[who],k401=get401k(p),savTotal=p.savingsRows.reduce((s,r)=>s+r.monthly,0)+k401;
-  const wrap=document.createElement('div');wrap.className='sav-section';wrap.id='sav-'+who;
-  const hd=document.createElement('div');hd.className='sav-hd';
-  hd.innerHTML='<span>Savings &amp; Investments</span><span class="sav-hd-sub">'+fmt(savTotal)+' / mo total</span>';
+  const p=S[who], k401=get401k(p), manualTotal=totalSavOOC(p);
+  const grandTotal=k401+manualTotal;
+
+  const wrap=document.createElement('div'); wrap.className='sav-section'; wrap.id='sav-'+who;
+
+  // ── Grand total header ────────────────────────────────────────
+  const hd=document.createElement('div'); hd.className='sav-hd';
+  hd.id='sav-hd-'+who;
+  hd.innerHTML='<span>Savings &amp; Investments</span>'
+    +'<span class="sav-hd-sub" id="sav-tot-lbl-'+who+'">'
+    +fmt(grandTotal)+' / mo total'
+    +(k401?' &nbsp;<span style="opacity:.7;font-size:11px">('+fmt(k401)+' 401k + '+fmt(manualTotal)+' manual)</span>':'')
+    +'</span>';
   wrap.appendChild(hd);
+
   const body=document.createElement('div');
-  if(k401>0){const r401=document.createElement('div');r401.style.cssText='padding:10px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:13px';r401.innerHTML='<span style="font-weight:600;color:var(--txt2)">401K <span style="font-weight:400;font-size:11px;color:var(--txt4)">(auto from payroll)</span></span><span style="font-weight:700;color:var(--pos)">'+fmt(k401)+'/mo</span>';body.appendChild(r401);}
-  const chd=document.createElement('div');chd.className='col-hd';chd.style.gridTemplateColumns='1fr 100px 130px 1fr 22px';
+
+  // ── 401k subsection ───────────────────────────────────────────
+  if(k401>0){
+    const sub401hd=document.createElement('div');
+    sub401hd.style.cssText='padding:8px 16px;background:var(--pos-l);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center';
+    sub401hd.innerHTML='<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--pos)">401k / Retirement</span>'
+      +'<span style="font-size:11px;color:var(--txt4)">auto-calculated from paycheck deductions</span>';
+    body.appendChild(sub401hd);
+    const r401=document.createElement('div');
+    r401.style.cssText='padding:10px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:13px';
+    r401.innerHTML='<span style="font-weight:600;color:var(--txt2)">401k <span style="font-weight:400;font-size:11px;color:var(--txt4)">(from payroll deductions)</span></span>'
+      +'<span style="font-weight:800;color:var(--pos);font-size:15px">'+fmt(k401)+'/mo</span>';
+    body.appendChild(r401);
+  }
+
+  // ── Manual savings subsection ─────────────────────────────────
+  const subMhd=document.createElement('div');
+  subMhd.style.cssText='padding:8px 16px;background:var(--brand-l);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center';
+  subMhd.innerHTML='<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--brand2)">Manual Savings</span>'
+    +'<span style="font-size:11px;color:var(--txt4)">accounts you actively fund</span>';
+  body.appendChild(subMhd);
+
+  const chd=document.createElement('div'); chd.className='col-hd';
+  chd.style.gridTemplateColumns='1fr 100px 130px 1fr 22px';
   chd.innerHTML='<div>Account / Fund</div><div style="text-align:right">Monthly</div><div>Institution</div><div>Notes</div><div></div>';
   body.appendChild(chd);
-  const srw=document.createElement('div');srw.id='srw-'+who;
+
+  const srw=document.createElement('div'); srw.id='srw-'+who;
   p.savingsRows.forEach(r=>srw.appendChild(buildSavRow(r,who)));
   body.appendChild(srw);
-  const addSav=document.createElement('button');addSav.className='add-row';
+
+  const addSav=document.createElement('button'); addSav.className='add-row';
   addSav.innerHTML='<span class="add-ico">+</span> Add savings account';
   addSav.onclick=()=>{const r=newSavRow();p.savingsRows.push(r);srw.appendChild(buildSavRow(r,who));updateSavTot(who);dirty(true);};
   body.appendChild(addSav);
-  const tot=document.createElement('div');tot.className='tot-row';tot.id='sav-tot-'+who;
+
+  // Manual savings total
+  const tot=document.createElement('div'); tot.className='tot-row'; tot.id='sav-tot-'+who;
   tot.style.gridTemplateColumns='1fr 100px 130px 1fr 22px';
-  tot.innerHTML='<div>Total Monthly Savings</div><div style="color:var(--pos);font-weight:800">'+fmt(savTotal)+'</div><div></div><div></div><div></div>';
-  body.appendChild(tot);wrap.appendChild(body);return wrap;
+  tot.innerHTML='<div>Manual Savings Total</div><div style="color:var(--brand2);font-weight:800" id="sav-tot-val-'+who+'">'+fmt(manualTotal)+'</div><div></div><div></div><div></div>';
+  body.appendChild(tot);
+
+  // Grand total row
+  const gtot=document.createElement('div'); gtot.className='tot-row';
+  gtot.style.cssText='grid-template-columns:1fr 100px 130px 1fr 22px;border-top:2px solid var(--border2);background:var(--bg2)';
+  gtot.innerHTML='<div style="font-weight:800">Total Savings (401k + Manual)</div>'
+    +'<div style="color:var(--pos);font-weight:900;font-size:15px" id="sav-grand-'+who+'">'+fmt(grandTotal)+'</div>'
+    +'<div></div><div></div><div></div>';
+  body.appendChild(gtot);
+
+  wrap.appendChild(body); return wrap;
 }
 function buildSavRow(r,who) {
   const row = document.createElement('div'); row.id='sr-'+r.id;
@@ -1497,7 +1616,19 @@ function renameSec(secId,who){const sec=S[who].sections.find(s=>s.id===secId);if
 function rmSec(secId,who){if(!confirm('Remove this section?'))return;S[who].sections=S[who].sections.filter(s=>s.id!==secId);const e=document.getElementById('sec-'+secId);if(e)e.remove();updateEbar(who);dirty(true);}
 function addSection(who){const label=prompt('Section name:');if(!label)return;const t=prompt('Type (expense/income):','expense')||'expense';const sec={id:uid(),label,type:t,rows:[]};S[who].sections.push(sec);const el=document.getElementById(who+'-entry');const ab=el&&el.querySelector('[onclick*="addSection"]');if(el)el.insertBefore(buildSection(sec,who),ab||null);dirty(true);}
 function updSav(id,who,f,v){const r=S[who].savingsRows.find(x=>x.id===id);if(!r)return;r[f]=v;updateSavTot(who);updateEbar(who);dirty(true);}
-function updateSavTot(who){const p=S[who],k401=get401k(p),tot=p.savingsRows.reduce((s,r)=>s+r.monthly,0)+k401;const te=document.getElementById('sav-tot-'+who);if(te){const cells=te.querySelectorAll('div');if(cells[1])cells[1].textContent=fmt(tot);}const hd=document.getElementById('sav-'+who);if(hd){const sh=hd.querySelector('.sav-hd-sub');if(sh)sh.textContent=fmt(tot)+' / mo total';}}
+function updateSavTot(who){
+  const p=S[who], k401=get401k(p), manualTotal=totalSavOOC(p), grandTotal=k401+manualTotal;
+  // Update manual total row
+  const mt=document.getElementById('sav-tot-val-'+who);
+  if(mt) mt.textContent=fmt(manualTotal);
+  // Update grand total row
+  const gt=document.getElementById('sav-grand-'+who);
+  if(gt) gt.textContent=fmt(grandTotal);
+  // Update header subtitle
+  const lbl=document.getElementById('sav-tot-lbl-'+who);
+  if(lbl) lbl.innerHTML=fmt(grandTotal)+' / mo total'
+    +(k401?' &nbsp;<span style="opacity:.7;font-size:11px">('+fmt(k401)+' 401k + '+fmt(manualTotal)+' manual)</span>':'');
+}
 function rmSav(id,who){S[who].savingsRows=S[who].savingsRows.filter(r=>r.id!==id);const e=document.getElementById('sr-'+id);if(e)e.remove();updateSavTot(who);updateEbar(who);dirty(true);}
 function updAcct(id,who,f,v){const a=S[who].accounts.find(x=>x.id===id);if(!a)return;a[f]=v;dirty(true);}
 function updAcctType(id,who,v) {
