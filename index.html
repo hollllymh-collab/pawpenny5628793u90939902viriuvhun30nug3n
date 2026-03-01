@@ -645,9 +645,13 @@ let S = {
 
 const netInc   = p => p.paychecks.reduce((s,pc) => s+pc.gross-(pc.deductions||[]).reduce((a,d)=>a+d.amount,0), 0);
 const grossInc = p => p.paychecks.reduce((s,pc) => s+pc.gross, 0);
-const totalExp = p => p.sections.filter(s=>s.type==='expense').reduce((s,sec)=>s+sec.rows.reduce((a,r)=>a+r.cost,0), 0);
+// Effective cost for a row: joint rows only count each person's share
+const effCost  = (r,who) => r.isJoint ? Math.round(r.cost * (r.owner===who ? r.jointPct : 100-r.jointPct) / 100) : r.cost;
+const totalExp = (p,who) => p.sections.filter(s=>s.type==='expense').reduce((s,sec)=>s+sec.rows.reduce((a,r)=>a+effCost(r,who||p.name.toLowerCase()),0), 0);
 const get401k  = p => p.paychecks.reduce((s,pc)=>s+(pc.deductions||[]).filter(d=>d.label.toLowerCase().includes('401')||d.label.toLowerCase().includes('retirement')).reduce((a,d)=>a+d.amount,0),0);
-const totalSav = p => p.savingsRows.reduce((s,r)=>s+r.monthly,0) + get401k(p);
+const totalSav    = p => p.savingsRows.reduce((s,r)=>s+r.monthly,0) + get401k(p);
+// Out-of-check savings only (excludes 401k already deducted from gross pay)
+const totalSavOOC = p => p.savingsRows.reduce((s,r)=>s+r.monthly,0);
 
 function getJointRows() {
   const map = {};
@@ -932,7 +936,7 @@ function renderDash(who) {
   const p=S[who], el=document.getElementById(who+'-dash');
   if(!el) return; el.innerHTML='';
   const color='var(--'+who+')';
-  const net=netInc(p),gross=grossInc(p),exp=totalExp(p),sav=totalSav(p),left=net-exp-sav,deds=gross-net;
+  const net=netInc(p),gross=grossInc(p),exp=totalExp(p),sav=totalSav(p),left=net-exp-totalSavOOC(p),deds=gross-net;
 
   // Consistent page title
   const ptitleD=document.createElement('div'); ptitleD.className='pg-title';
@@ -1009,7 +1013,7 @@ function renderDash(who) {
 function renderEntry(who) {
   const p=S[who], el=document.getElementById(who+'-entry');
   if(!el) return; el.innerHTML='';
-  const net=netInc(p),exp=totalExp(p),sav=totalSav(p),left=net-exp-sav;
+  const net=netInc(p),exp=totalExp(p,who),sav=totalSav(p),left=net-exp-totalSavOOC(p);
   // Page title header
   const ptitle=document.createElement('div'); ptitle.className='pg-title';
   const ptbadge=document.createElement('img'); ptbadge.src=BADGE_SRC; ptbadge.alt='';
@@ -1120,7 +1124,7 @@ function buildDedRow(d,pcId,who) {
 
 
 function buildSection(sec,who) {
-  const total=sec.rows.reduce((s,r)=>s+r.cost,0);
+  const total=sec.rows.reduce((s,r)=>s+effCost(r,who),0);
   const tc=sec.type==='savings'?'var(--pos)':sec.type==='income'?'var(--brand)':'var(--txt)';
   const shell=buildSec(sec.label,fmt(total),tc,sec.id,who);
   const body=shell.querySelector('.sec-body'); openSec(shell);
@@ -1368,7 +1372,7 @@ function updDed(pcId,dId,who,f,v){const pc=S[who].paychecks.find(p=>p.id===pcId)
 function rmDed(pcId,dId,who){const pc=S[who].paychecks.find(p=>p.id===pcId);if(!pc)return;pc.deductions=pc.deductions.filter(d=>d.id!==dId);document.getElementById('ded-'+dId)&&document.getElementById('ded-'+dId).remove();refreshNet(pcId,who);updatePCTot(who);updateEbar(who);dirty(true);}
 function rmPC(id,who){S[who].paychecks=S[who].paychecks.filter(p=>p.id!==id);const e=document.getElementById('pc-'+id);if(e)e.remove();updatePCTot(who);updateEbar(who);dirty(true);}
 function updRow(secId,rowId,who,f,v){const sec=S[who].sections.find(s=>s.id===secId);if(!sec)return;const r=sec.rows.find(x=>x.id===rowId);if(!r)return;r[f]=v;updateSecTot(secId,who);updateEbar(who);if(['isJoint','jointPct','cost'].includes(f))renderJoint();dirty(true);}
-function updateSecTot(secId,who){const sec=S[who].sections.find(s=>s.id===secId);if(!sec)return;const t=sec.rows.reduce((s,r)=>s+r.cost,0);const tc=sec.type==='savings'?'var(--pos)':sec.type==='income'?'var(--brand)':'var(--txt)';const te=document.getElementById('st-'+secId);if(te){const cells=te.querySelectorAll('div');if(cells[4])cells[4].textContent=fmt(t);}const se=document.getElementById('sec-'+secId);if(se){const tt=se.querySelector('.sec-tot');if(tt)tt.textContent=fmt(t);}}
+function updateSecTot(secId,who){const sec=S[who].sections.find(s=>s.id===secId);if(!sec)return;const t=sec.rows.reduce((s,r)=>s+effCost(r,who),0);const tc=sec.type==='savings'?'var(--pos)':sec.type==='income'?'var(--brand)':'var(--txt)';const te=document.getElementById('st-'+secId);if(te){const cells=te.querySelectorAll('div');if(cells[4])cells[4].textContent=fmt(t);}const se=document.getElementById('sec-'+secId);if(se){const tt=se.querySelector('.sec-tot');if(tt)tt.textContent=fmt(t);}}
 function rmRow(secId,rowId,who){const sec=S[who].sections.find(s=>s.id===secId);if(!sec)return;sec.rows=sec.rows.filter(r=>r.id!==rowId);const e=document.getElementById('row-'+rowId);if(e)e.remove();updateSecTot(secId,who);updateEbar(who);renderJoint();dirty(true);}
 function renameSec(secId,who){const sec=S[who].sections.find(s=>s.id===secId);if(!sec)return;const nm=prompt('Section name:',sec.label);if(!nm)return;sec.label=nm;const e=document.getElementById('sec-'+secId);if(e){const t=e.querySelector('.sec-ttl');if(t)t.textContent=nm;}dirty(true);}
 function rmSec(secId,who){if(!confirm('Remove this section?'))return;S[who].sections=S[who].sections.filter(s=>s.id!==secId);const e=document.getElementById('sec-'+secId);if(e)e.remove();updateEbar(who);dirty(true);}
@@ -1394,7 +1398,7 @@ function updAcctType(id,who,v) {
 }
 
 function rmAcct(id,who){S[who].accounts=S[who].accounts.filter(a=>a.id!==id);const e=document.getElementById('ar-'+id);if(e)e.remove();dirty(true);}
-function updateEbar(who){const p=S[who],net=netInc(p),exp=totalExp(p),sav=totalSav(p),left=net-exp-sav;const e=document.getElementById(who+'-ebar');if(e)e.innerHTML='<div class="es"><div class="es-lbl">Net Income</div><div class="es-val">'+fmt(net)+'</div></div><div class="es-div"></div><div class="es"><div class="es-lbl">Expenses</div><div class="es-val">'+fmt(exp)+'</div></div><div class="es-div"></div><div class="es"><div class="es-lbl">Savings</div><div class="es-val">'+fmt(sav)+'</div></div><div class="es-div"></div><div class="es"><div class="es-lbl">Left Over</div><div class="es-val">'+fmt(left)+'</div></div>';}
+function updateEbar(who){const p=S[who],net=netInc(p),exp=totalExp(p,who),sav=totalSav(p),left=net-exp-totalSavOOC(p);const e=document.getElementById(who+'-ebar');if(e)e.innerHTML='<div class="es"><div class="es-lbl">Net Income</div><div class="es-val">'+fmt(net)+'</div></div><div class="es-div"></div><div class="es"><div class="es-lbl">Expenses</div><div class="es-val">'+fmt(exp)+'</div></div><div class="es-div"></div><div class="es"><div class="es-lbl">Savings</div><div class="es-val">'+fmt(sav)+'</div></div><div class="es-div"></div><div class="es"><div class="es-lbl">Left Over</div><div class="es-val">'+fmt(left)+'</div></div>';}
 
 function renderCal(){
   const title=document.getElementById('cal-title');if(title)title.textContent=MONTHS[S.calMonth]+' '+S.calYear;
