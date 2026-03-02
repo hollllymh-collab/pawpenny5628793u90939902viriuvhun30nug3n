@@ -661,6 +661,22 @@ button,input,select,textarea{font-family:'Inter',sans-serif;letter-spacing:-.01e
   </div>
 </div>
 
+
+<!-- SECTION MODAL -->
+<div id="sec-modal" class="sec-modal-overlay" style="display:none" onclick="if(event.target===this)closeSectionModal()">
+  <div class="sec-modal">
+    <div class="sec-modal-title" id="sec-modal-title">New Section</div>
+    <input type="text" id="sec-modal-input" placeholder="Section name e.g. Housing" maxlength="40">
+    <div id="sec-modal-types" class="sec-modal-types">
+      <button class="sec-type-btn active" data-type="expense" onclick="setSectionType('expense')">Expense</button>
+      <button class="sec-type-btn" data-type="income" onclick="setSectionType('income')">Income</button>
+    </div>
+    <div class="sec-modal-btns">
+      <button class="sec-modal-cancel" onclick="closeSectionModal()">Cancel</button>
+      <button class="bsave" id="sec-modal-save" onclick="confirmSectionModal()">Add Section</button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"><span id="ti"></span><span id="tm"></span></div>
 <script>
 
@@ -1262,7 +1278,7 @@ function renderEntry(who) {
   pcTot.innerHTML='<div>Total</div><div></div><div>'+fmt(grossInc(p))+'</div><div style="color:var(--pos);font-weight:800">'+fmt(netInc(p))+'</div><div></div>';
   pcBody.appendChild(pcTot); el.appendChild(pcSec);
   p.sections.forEach(sec=>el.appendChild(buildSection(sec,who)));
-  const addSec=document.createElement('button'); addSec.className='add-row';
+  const addSec=document.createElement('button'); addSec.className='add-row add-sec-btn';
   addSec.style.cssText='background:var(--white);border:1px solid var(--border);border-radius:var(--r);margin-bottom:16px';
   addSec.innerHTML='<span class="add-ico">+</span> Add expense section';
   addSec.onclick=()=>addSection(who);
@@ -1374,6 +1390,27 @@ function moveRow(fromSecId, rowId, toSecId, who) {
   if(ri===-1) return;
   const [row] = fromSec.rows.splice(ri,1);
   toSec.rows.push(row);
+
+  // If this is a canonical joint row, move the mirror on partner's page too
+  if(row.isJoint && !row.isMirror && row.jointKey){
+    const ow = other(who);
+    const toLabel = toSec.label;
+    let mirrorSec = null, mirror = null;
+    S[ow].sections.forEach(s=>s.rows.forEach(x=>{
+      if(x.jointKey===row.jointKey){ mirror=x; mirrorSec=s; }
+    }));
+    if(mirror && mirrorSec){
+      // Find or create matching section on partner's page
+      let targetSec = S[ow].sections.find(s=>s.label===toLabel && s.type==='expense');
+      if(!targetSec){ targetSec={id:uid(),label:toLabel,type:'expense',rows:[]}; S[ow].sections.push(targetSec); }
+      if(mirrorSec.id !== targetSec.id){
+        mirrorSec.rows = mirrorSec.rows.filter(x=>x.id!==mirror.id);
+        targetSec.rows.push(mirror);
+        renderEntry(ow); // re-render partner's entry page
+      }
+    }
+  }
+
   // Rebuild both sections visually
   updateSecTot(fromSecId,who);
   updateSecTot(toSecId,who);
@@ -1604,14 +1641,27 @@ function saveJM(){
   // isMirror=true flags it as read-only reference on partner's page.
   const owPct = 100 - jmPct; // partner's share %
   if(mirror){
+    // Move mirror to matching-label section if it's in the wrong one
+    let mirrorSec = null;
+    S[ow].sections.forEach(s=>{ if(s.rows.find(x=>x.id===mirror.id)) mirrorSec=s; });
+    const targetSec = S[ow].sections.find(s=>s.label===sec.label && s.type==='expense');
+    if(targetSec && mirrorSec && mirrorSec.id !== targetSec.id){
+      mirrorSec.rows = mirrorSec.rows.filter(x=>x.id!==mirror.id);
+      targetSec.rows.push(mirror);
+    } else if(!targetSec && mirrorSec && mirrorSec.label !== sec.label){
+      // Create correct section and move mirror there
+      const newSec={id:uid(),label:sec.label,type:'expense',rows:[mirror]};
+      mirrorSec.rows = mirrorSec.rows.filter(x=>x.id!==mirror.id);
+      S[ow].sections.push(newSec);
+    }
     mirror.cost=total; mirror.isJoint=true; mirror.jointPct=owPct;
     mirror.owner=who; // keep canonical owner
     mirror.isMirror=true;
     mirror.dueDay=r.dueDay; mirror.frequency=r.frequency; mirror.label=r.label;
   } else {
-    // Find matching section by label on partner's page, or first expense section
-    let ts = S[ow].sections.find(s=>s.label===sec.label && s.type==='expense')
-          || S[ow].sections.find(s=>s.type==='expense');
+    // Always place mirror in the section with the SAME LABEL on partner's page.
+    // If that section doesn't exist yet, create it — never fall back to a random section.
+    let ts = S[ow].sections.find(s=>s.label===sec.label && s.type==='expense');
     if(!ts){ ts={id:uid(),label:sec.label,type:'expense',rows:[]}; S[ow].sections.push(ts); }
     const mirrorRow = Object.assign(newRow(), {
       id: uid(),
