@@ -410,6 +410,290 @@ button,input,select,textarea{font-family:'Inter',sans-serif;letter-spacing:-.01e
 .sec-modal-btns .bsave{flex:1}
 .sec-modal-cancel{flex:1;padding:10px;border-radius:8px;border:1.5px solid var(--border);
   background:none;font-size:13px;font-weight:600;color:var(--txt3);cursor:pointer}
+
+/* ════════════════════════════════════════════════════════
+   MOBILE-FIRST RESPONSIVE — full overhaul
+   ════════════════════════════════════════════════════════ */
+
+/* ── Shared touch improvements ─────────────────────────── */
+@media(max-width:768px){
+  /* Nav: tighter, always scrollable */
+  .nav{padding:0 8px;gap:0;min-height:52px}
+  .nav-l{gap:2px;padding:4px 0}
+  .ntabs{gap:2px;padding:2px 0;flex-wrap:nowrap}
+  .nt{padding:7px 10px;font-size:11.5px;white-space:nowrap;border-radius:7px;min-height:36px}
+  .nav-r{gap:8px}
+  .msel select{font-size:12px;padding:4px 6px}
+  .uav{width:34px;height:34px;font-size:13px}
+
+  /* Main content area */
+  .main{padding:12px 10px}
+
+  /* Home */
+  .home-wrap{padding:16px 10px 24px}
+  .home-grid{grid-template-columns:1fr;gap:8px}
+  .hcard{padding:14px 16px}
+
+  /* Stat cards: 2-col on tablet */
+  .cg4,.cg5{grid-template-columns:repeat(2,1fr)}
+  .cg3{grid-template-columns:repeat(2,1fr)}
+  .card{padding:14px}
+
+  /* Insights grid: single col */
+  .ins-grid{grid-template-columns:1fr}
+
+  /* Joint household summary bar: 2×2 grid */
+  .hh-summary-bar{grid-template-columns:1fr 1px 1fr !important}
+  .hh-div-v{display:none}
+
+  /* Joint expense table: hide split % col, compress */
+  .jt-hd,.jt-row{font-size:12px}
+
+  /* Calendar */
+  .cal-day{min-height:38px;padding:3px}
+  .cal-dhd{font-size:10px}
+
+  /* Entry bar: wrap to 2 rows */
+  .ebar{flex-wrap:wrap;gap:0;padding:10px 12px}
+  .es{min-width:calc(33% - 1px);padding:4px 8px}
+  .es-lbl{font-size:9.5px}
+  .es-val{font-size:14px}
+  .es-div{display:none}
+
+  /* Section headers */
+  .sec-hd{padding:10px 14px;gap:6px}
+  .sec-acts{gap:4px}
+  .sbtn{padding:4px 8px;font-size:11px}
+
+  /* Modals: full width */
+  .joint-box{padding:20px;max-width:100%}
+  .sec-modal{padding:18px}
+
+  /* Page title */
+  .pg-title-name{font-size:18px}
+
+  /* Bigger touch targets for inputs and buttons */
+  .fi input,.fi select{min-height:36px;font-size:14px}
+  .xbtn{width:36px;height:36px;font-size:16px}
+  .add-row{min-height:40px;font-size:13px}
+  .bsave,.sbtn{min-height:36px}
+}
+
+/* ── Mobile: entry rows become cards (≤600px) ─────────── */
+@media(max-width:600px){
+  .main{padding:10px 8px}
+  .cg4,.cg5,.cg3,.cg2{grid-template-columns:1fr}
+
+  /* Hide desktop column headers entirely */
+  .col-hd{display:none}
+
+  /* Entry rows: card layout instead of grid */
+  .drow{
+    display:flex !important;
+    flex-direction:column !important;
+    gap:0 !important;
+    padding:12px 14px !important;
+    border-radius:10px !important;
+    border:1px solid var(--border) !important;
+    background:var(--white) !important;
+    margin-bottom:6px !important;
+    border-left:3px solid var(--border2) !important;
+  }
+  /* Row primary line: label takes full width */
+  .drow-name{
+    font-size:14px;font-weight:600;color:var(--txt);
+    margin-bottom:8px;min-width:0;
+  }
+  /* Row meta line: chips for joint, freq, due, cost */
+  .drow-meta{
+    display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+    margin-bottom:6px;
+  }
+  /* Row input line: cost + note side by side */
+  .drow-inputs{
+    display:grid;grid-template-columns:1fr 1fr;gap:6px;
+    margin-bottom:4px;
+  }
+  .drow-inputs-full{
+    display:grid;grid-template-columns:1fr;gap:4px;
+  }
+  /* Make all inputs in a drow full-width and taller */
+  .drow .fi{width:100%;margin:0}
+  .drow .fi input,.drow .fi select{
+    width:100%;font-size:14px;padding:8px 10px;min-height:40px;
+    border-radius:8px;
+  }
+  /* Delete button: sits at bottom right */
+  .drow .xbtn{
+    align-self:flex-end;margin-top:4px;
+    width:40px;height:40px;
+  }
+
+  /* Savings rows */
+  .sav-section{border-radius:10px;overflow:hidden;margin-bottom:10px}
+  .sav-hd{padding:12px 14px}
+
+  /* Paycheck cards */
+  .pc-card{border-radius:10px;margin-bottom:8px}
+
+  /* Section header: stack label and total */
+  .sec-ttl{font-size:14px}
+  .sec-tot{font-size:14px}
+  .sec-acts .sbtn{padding:5px 10px}
+
+  /* Entry bar: 2 per row */
+  .ebar{padding:8px 10px}
+  .es{min-width:calc(50% - 1px)}
+
+  /* Page title smaller */
+  .pg-title-name{font-size:16px}
+  .pg-title img{height:22px}
+
+  /* Joint table: name + amounts only, hide split col */
+  .jt-hd > div:nth-child(2),
+  .jt-row > div:nth-child(2){ display:none }
+
+  /* Bigger joint modal handle */
+  .split-handle{width:32px;height:32px;top:9px}
+
+  /* Calendar: smaller cells */
+  .cal-day{min-height:32px;font-size:10px}
+  .cal-ev{font-size:9px;padding:1px 3px}
+
+  /* Nav: smaller text */
+  .nt{padding:6px 8px;font-size:11px}
+
+  /* Toast bottom margin for safe area */
+  .toast{bottom:24px}
+}
+
+/* ── Small phones ≤380px ──────────────────────────────── */
+@media(max-width:380px){
+  .nt{padding:5px 6px;font-size:10px}
+  .main{padding:8px 6px}
+  .drow{padding:10px 12px !important}
+  .card{padding:12px 10px}
+  .c-val{font-size:18px}
+}
+
+
+@media(max-width:600px){
+  /* drow children: label=1, category=2, joint=3, freq=4, due=5, cost=6, note=7, web=8, x=9 */
+  .drow-lw    { order:1; width:100% }
+  /* sw = category selector — show as compact select */
+  .drow > div:nth-child(2) { order:2 } /* category */
+  .drow > div:nth-child(3) { order:3 } /* joint badge */
+  .drow > div:nth-child(4) { order:4 } /* frequency */
+  .drow > div:nth-child(5) { order:5 } /* due date */
+  .drow > div:nth-child(6) { order:6 } /* cost */
+  .drow > div:nth-child(7) { order:7 } /* comment */
+  .drow > div:nth-child(8) { order:8 } /* website */
+  .drow .xbtn { order:9 }
+
+  /* Group 2-5 (cat/joint/freq/due) in a flex row */
+  .drow > div:nth-child(2),
+  .drow > div:nth-child(3),
+  .drow > div:nth-child(4),
+  .drow > div:nth-child(5){
+    flex:1;min-width:calc(50% - 4px);max-width:calc(50% - 4px)
+  }
+  /* Cost and comment side by side */
+  .drow > div:nth-child(6),
+  .drow > div:nth-child(7){
+    flex:1;min-width:calc(50% - 4px);max-width:calc(50% - 4px)
+  }
+  /* Website full width */
+  .drow > div:nth-child(8){
+    width:100%;flex:none
+  }
+  /* All drow direct children except xbtn wrap */
+  .drow{ flex-wrap:wrap; align-items:flex-start }
+  .drow .fi{ margin-bottom:4px }
+}
+
+
+@media(max-width:600px){
+  /* Savings rows: stack vertically */
+  div[id^="sr-"]{
+    display:flex !important;
+    flex-direction:column !important;
+    gap:4px !important;
+    padding:12px 14px !important;
+    border-radius:8px !important;
+    border:1px solid var(--border) !important;
+    margin-bottom:6px !important;
+  }
+  div[id^="sr-"] > div{ width:100% }
+  /* Account rows */
+  div[id^="ar-"]{
+    display:flex !important;
+    flex-direction:column !important;
+    gap:4px !important;
+    padding:12px 14px !important;
+  }
+  div[id^="ar-"] > div{ width:100% }
+  /* Paycheck card grid */
+  div[id^="pc-"]{padding:12px 14px}
+  .pc-ded-row{grid-template-columns:1fr 90px 22px}
+
+  /* Tot rows */
+  .tot-row{
+    display:flex !important;
+    flex-wrap:wrap !important;
+    gap:8px !important;
+    padding:10px 14px !important;
+  }
+  .tot-row > div:first-child{flex:1;font-size:13px}
+  .tot-row > div:nth-child(2){font-size:16px}
+}
+
+
+/* ── Mobile bottom nav bar ──────────────────────────────── */
+@media(max-width:600px){
+  /* Hide top nav tabs on mobile — use bottom bar instead */
+  .ntabs{ display:none }
+
+  /* Bottom nav bar */
+  #mob-nav{
+    display:flex;
+    position:fixed;bottom:0;left:0;right:0;
+    background:var(--white);
+    border-top:1.5px solid var(--border);
+    z-index:200;
+    padding:0;
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+  }
+  #mob-nav button{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:8px 4px;border:none;background:none;cursor:pointer;
+    font-size:9.5px;font-weight:600;color:var(--txt3);line-height:1.2;
+    gap:4px;min-height:54px;
+    transition:.15s;
+  }
+  #mob-nav button svg{ width:20px;height:20px;stroke-width:2 }
+  #mob-nav button.mob-active{ color:var(--brand2) }
+  #mob-nav button.mob-active svg{ stroke:var(--brand2) }
+  #mob-nav button.mob-holly{ }
+  #mob-nav button.mob-holly.mob-active{ color:var(--holly) }
+  #mob-nav button.mob-holly.mob-active svg{ stroke:var(--holly) }
+  #mob-nav button.mob-berta.mob-active{ color:var(--berta) }
+  #mob-nav button.mob-berta.mob-active svg{ stroke:var(--berta) }
+
+  /* Push content up so bottom nav doesn't cover it */
+  .tc{ padding-bottom:70px }
+  #tc-home .home-wrap{ padding-bottom:80px }
+
+  /* Month selector stays in nav but compact */
+  .nav{ min-height:44px; padding:0 10px }
+  .nav-r{ gap:6px }
+
+  /* More/less padding on main */
+  .main{ padding:10px 10px 80px }
+}
+@media(min-width:601px){
+  #mob-nav{ display:none }
+}
+
 </style>
 </head>
 <body>
@@ -526,25 +810,25 @@ button,input,select,textarea{font-family:'Inter',sans-serif;letter-spacing:-.01e
   <div id="tc-joint" class="tc">
     <div class="main">
       <!-- Household summary bar -->
-      <div style="background:var(--brand);border-radius:12px;padding:16px 20px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1px 1fr 1px 1fr 1px 1fr;gap:0;align-items:center">
+      <div class="hh-summary-bar" style="background:var(--brand);border-radius:12px;padding:16px 20px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1px 1fr 1px 1fr 1px 1fr;gap:0;align-items:center">
         <div style="text-align:center">
           <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.65)">Household Income</div>
           <div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:-.02em" id="jd-hh-inc">$0</div>
           <div style="font-size:11px;color:rgba(255,255,255,.55)" id="jd-hh-inc-sub">combined net</div>
         </div>
-        <div style="background:rgba(255,255,255,.2);width:1px;height:40px;margin:auto"></div>
+        <div class="hh-div-v" style="background:rgba(255,255,255,.2);width:1px;height:40px;margin:auto"></div>
         <div style="text-align:center">
           <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.65)">Total Expenses</div>
           <div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:-.02em" id="jd-hh-exp">$0</div>
           <div style="font-size:11px;color:rgba(255,255,255,.55)" id="jd-hh-exp-sub">all expenses</div>
         </div>
-        <div style="background:rgba(255,255,255,.2);width:1px;height:40px;margin:auto"></div>
+        <div class="hh-div-v" style="background:rgba(255,255,255,.2);width:1px;height:40px;margin:auto"></div>
         <div style="text-align:center">
           <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.65)">Total Savings</div>
           <div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:-.02em" id="jd-hh-sav">$0</div>
           <div style="font-size:11px;color:rgba(255,255,255,.55)" id="jd-hh-sav-sub">manual + 401k</div>
         </div>
-        <div style="background:rgba(255,255,255,.2);width:1px;height:40px;margin:auto"></div>
+        <div class="hh-div-v" style="background:rgba(255,255,255,.2);width:1px;height:40px;margin:auto"></div>
         <div style="text-align:center">
           <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.65)">Household Left Over</div>
           <div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:-.02em" id="jd-hh-left">$0</div>
@@ -1606,9 +1890,10 @@ function buildRow(r,sec,who) {
     return row;
   }
 
-  const lw = document.createElement('div');
+  const lw = document.createElement('div'); lw.className='drow-lw';
   const lf = document.createElement('div'); lf.className='fi l';
   const li = document.createElement('input'); li.type='text'; li.value=r.label; li.placeholder='Name / vendor...';
+  li.setAttribute('aria-label','Expense name');
   li.oninput = function(){ updRow(sec.id,r.id,who,'label',this.value); }; lf.appendChild(li); lw.appendChild(lf);
 
   const jw = document.createElement('div'); jw.style.cssText='display:flex;justify-content:center';
@@ -2053,8 +2338,25 @@ function go(n){
   document.querySelectorAll('.tc').forEach(t=>t.classList.remove('on'));
   const nt=document.getElementById('nt-'+n);if(nt)nt.classList.add('on');
   const tc=document.getElementById('tc-'+n);if(tc)tc.classList.add('on');
+  // Mobile bottom nav active state
+  ['mn-home','mn-joint','mn-holly-e','mn-berta-e','mn-more'].forEach(b=>{
+    const el=document.getElementById(b); if(el) el.classList.remove('mob-active');
+  });
+  const mobMap={home:'mn-home',joint:'mn-joint','holly-e':'mn-holly-e','berta-e':'mn-berta-e',
+                holly:'mn-more',berta:'mn-more',cal:'mn-more'};
+  const mobBtn=document.getElementById(mobMap[n]||'');
+  if(mobBtn) mobBtn.classList.add('mob-active');
+  closeMobMore();
   const m={home:function(){},joint:renderJoint,holly:function(){renderDash('holly');},berta:function(){renderDash('berta');},'holly-e':function(){renderEntry('holly');},'berta-e':function(){renderEntry('berta');},cal:renderCal};
   if(m[n])m[n]();
+}
+function mobMore(){
+  const m=document.getElementById('mob-more-menu');
+  if(m) m.style.display=m.style.display==='none'?'block':'none';
+}
+function closeMobMore(){
+  const m=document.getElementById('mob-more-menu');
+  if(m) m.style.display='none';
 }
 function buildSec(title,totalStr,color,secId,who) {
   const s = document.createElement('div'); s.className='sec'; if(secId) s.id='sec-'+secId;
@@ -2202,5 +2504,38 @@ function rebuildCategorySelects(who){
 }
 
 </script>
+
+<!-- MOBILE BOTTOM NAV -->
+<div id="mob-nav">
+  <button onclick="go('home')" id="mn-home" title="Home">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    Home
+  </button>
+  <button onclick="go('joint')" id="mn-joint" title="Joint">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><path d="M16 3.13a4 4 0 010 7.75"/><path d="M21 21v-2a4 4 0 00-3-3.87"/></svg>
+    Joint
+  </button>
+  <button onclick="go('holly-e')" id="mn-holly-e" class="mob-holly" title="Holly Entry">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    Holly
+  </button>
+  <button onclick="go('berta-e')" id="mn-berta-e" class="mob-berta" title="Berta Entry">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    Berta
+  </button>
+  <button onclick="mobMore()" id="mn-more" title="More">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
+    More
+  </button>
+</div>
+
+<!-- MOBILE MORE MENU -->
+<div id="mob-more-menu" style="display:none;position:fixed;bottom:62px;left:0;right:0;background:var(--white);border-top:1.5px solid var(--border);z-index:199;padding:8px 0">
+  <button onclick="go('holly');closeMobMore()" style="width:100%;padding:14px 20px;text-align:left;background:none;border:none;border-bottom:1px solid var(--border);font-size:14px;font-weight:600;color:var(--holly);cursor:pointer">Holly — Dashboard</button>
+  <button onclick="go('berta');closeMobMore()" style="width:100%;padding:14px 20px;text-align:left;background:none;border:none;border-bottom:1px solid var(--border);font-size:14px;font-weight:600;color:var(--berta);cursor:pointer">Berta — Dashboard</button>
+  <button onclick="go('cal');closeMobMore()" style="width:100%;padding:14px 20px;text-align:left;background:none;border:none;border-bottom:1px solid var(--border);font-size:14px;font-weight:600;color:var(--txt2);cursor:pointer">Calendar</button>
+  <button onclick="signOut();closeMobMore()" style="width:100%;padding:14px 20px;text-align:left;background:none;border:none;font-size:14px;font-weight:600;color:var(--warn);cursor:pointer">Sign Out</button>
+</div>
+
 </body>
 </html>
