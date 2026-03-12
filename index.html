@@ -879,30 +879,62 @@ function setupUI() {
 }
 
 function initAuth() {
+  // Restore persisted sheet ID and user key
+  const savedSid   = localStorage.getItem('pp_sid');
+  const savedMyKey = localStorage.getItem('pp_myKey');
+  if(savedSid)   S.sid   = savedSid;
+  if(savedMyKey) S.myKey = savedMyKey;
+
   const sc=document.createElement('script'); sc.src='https://accounts.google.com/gsi/client';
-  sc.onload=()=>{ const t=sessionStorage.getItem('pp_t'); if(t){S.token=t;fetchUser();} };
+  sc.onload=()=>{
+    const t   = localStorage.getItem('pp_t');
+    const exp = parseInt(localStorage.getItem('pp_t_exp')||'0');
+    const valid = t && Date.now() < exp;
+    if(valid){ S.token=t; fetchUser(); }
+    else {
+      localStorage.removeItem('pp_t');
+      localStorage.removeItem('pp_t_exp');
+      show('sl');
+    }
+  };
   document.head.appendChild(sc);
 }
 function signIn() {
   if(DEMO){seedDemo();setupUI();show('sa');renderAll();go('home');return;}
   const c=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPES,
-    callback:r=>{if(r.access_token){S.token=r.access_token;sessionStorage.setItem('pp_t',r.access_token);fetchUser();}}});
+    callback:r=>{
+      if(r.access_token){
+        S.token=r.access_token;
+        localStorage.setItem('pp_t',r.access_token);
+        localStorage.setItem('pp_t_exp', Date.now() + 3500*1000); // ~58 min
+        fetchUser();
+      }
+    }});
   c.requestAccessToken();
 }
 function fetchUser() {
   fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:`Bearer ${S.token}`}})
     .then(r=>r.json()).then(u=>{
       S.user=u; const nm=(u.given_name||u.name||'').toLowerCase();
-      S.myKey=nm.includes('berta')?'berta':'holly'; setupUI();
+      S.myKey=nm.includes('berta')?'berta':'holly';
+      localStorage.setItem('pp_myKey', S.myKey);
+      if(S.sid) localStorage.setItem('pp_sid', S.sid);
+      setupUI();
       if(!S.sid) show('ss'); else loadSheet();
     }).catch(()=>show('sl'));
 }
-function signOut() { sessionStorage.removeItem('pp_t'); S.token=null; show('sl'); }
+function signOut() {
+  ['pp_t','pp_t_exp','pp_sid','pp_myKey'].forEach(k=>localStorage.removeItem(k));
+  S.token=null; show('sl');
+}
 function completeSetup() {
   const id=document.getElementById('s-sid').value.trim();
   const nm=document.getElementById('s-nm').value.trim().toLowerCase();
   if(!id){alert('Please enter Sheet ID');return;}
-  S.sid=id; S.myKey=nm.includes('berta')?'berta':'holly'; loadSheet();
+  S.sid=id; S.myKey=nm.includes('berta')?'berta':'holly';
+  localStorage.setItem('pp_sid', S.sid);
+  localStorage.setItem('pp_myKey', S.myKey);
+  loadSheet();
 }
 
 const API='https://sheets.googleapis.com/v4/spreadsheets';
@@ -966,7 +998,17 @@ async function save() {
     await req('/values/PawPenny!A:D?valueInputOption=RAW','PUT',
       {range:'PawPenny!A:D',majorDimension:'ROWS',values:[...final,...newRows]});
     dirty(false); toast('ok','Saved');
-  } catch(e){ toast('err','Save failed'); }
+  } catch(e){
+    const expired = e && (e.status===401 || (e.message&&e.message.includes('401')));
+    if(expired || (S.token && Date.now() > parseInt(localStorage.getItem('pp_t_exp')||'0'))){
+      toast('err','Session expired — please sign in again');
+      localStorage.removeItem('pp_t'); localStorage.removeItem('pp_t_exp');
+      setTimeout(()=>show('sl'),2000);
+    } else {
+      toast('err','Save failed — check connection');
+    }
+    console.error('Save error:',e);
+  }
   btn.textContent='Save Changes'; btn.disabled=false;
 }
 
@@ -2042,7 +2084,23 @@ function buildSec(title,totalStr,color,secId,who) {
 function toggleSec(hd){const b=hd.nextElementSibling,c=hd.querySelector('.sec-chev');b.classList.toggle('open');c.classList.toggle('open');hd.classList.toggle('open');}
 function toggleDed(btn,id){const w=document.getElementById(id);if(w)w.classList.toggle('open');btn.textContent=(document.getElementById(id)&&document.getElementById(id).classList.contains('open')?'Hide':'Show')+' deductions';}
 function openSec(shell){const hd=shell.querySelector('.sec-hd'),b=shell.querySelector('.sec-body'),c=shell.querySelector('.sec-chev');if(hd)hd.classList.add('open');if(b)b.classList.add('open');if(c)c.classList.add('open');}
-function dirty(d){S.dirty=d;const dot=document.getElementById('sdot');if(dot)dot.className='sdot'+(d?' dirty':'');const txt=document.getElementById('stxt');if(txt)txt.textContent=d?'Unsaved changes':'All saved';const btn=document.getElementById('sbtn');if(btn)btn.disabled=!d;}
+let _autoSaveTimer=null;
+function dirty(d){
+  S.dirty=d;
+  const dot=document.getElementById('sdot');
+  if(dot) dot.className='sdot'+(d?' dirty':'');
+  const txt=document.getElementById('stxt');
+  if(txt) txt.textContent=d?'Unsaved changes':'All saved';
+  const btn=document.getElementById('sbtn');
+  if(btn) btn.disabled=!d;
+  // Auto-save 8 seconds after last change
+  if(d && !DEMO){
+    clearTimeout(_autoSaveTimer);
+    _autoSaveTimer=setTimeout(()=>{
+      if(S.dirty && S.token) save();
+    }, 8000);
+  }
+}
 function toast(type,msg){const t=document.getElementById('toast');const ti=document.getElementById('ti');const tm=document.getElementById('tm');if(!t||!ti||!tm)return;tm.textContent=msg;ti.innerHTML=type==='ok'?'&#10003;':'&#10007;';t.className='toast '+type+' on';setTimeout(()=>t.classList.remove('on'),3200);}
 
 
