@@ -726,6 +726,10 @@ select option{background:var(--surface);color:var(--txt)}
 #mob-more-menu button:last-child{border-bottom:none}
 #mob-more-menu button:hover{background:var(--surface2)}
 #mob-more-menu button:active{background:var(--bg3)}
+
+/* ── CC Tracker ── */
+#cc-main .acct-row{border-radius:0}
+
 </style>
 </head>
 <body>
@@ -769,6 +773,7 @@ select option{background:var(--surface);color:var(--txt)}
       <button class="nt holly"   id="nt-holly-e" onclick="go('holly-e')">Holly Entry</button>
       <button class="nt holly"   id="nt-holly"   onclick="go('holly')">Holly</button>
       <button class="nt cal"     id="nt-cal"     onclick="go('cal')">Calendar</button>
+      <button class="nt joint"   id="nt-cc"      onclick="go('cc')">&#9654; Credit Cards</button>
     </div>
     <div class="nav-r">
       <div class="msel">
@@ -831,6 +836,13 @@ select option{background:var(--surface);color:var(--txt)}
           <div class="hcard-bar" style="background:var(--berta)"></div>
           <div><div class="hcard-title" style="color:var(--berta)">Berta &mdash; Entry</div>
           <div class="hcard-sub">Income, expenses &amp; savings</div></div>
+          <div class="hcard-arrow">&#8250;</div>
+        </button>
+
+        <button class="hcard" onclick="go('cc')" style="grid-column:1/-1">
+          <div class="hcard-bar" style="background:var(--warn)"></div>
+          <div><div class="hcard-title" style="color:var(--warn)">Credit Card Tracker</div>
+          <div class="hcard-sub">Benefits, rewards, limits &amp; APR across all travel cards</div></div>
           <div class="hcard-arrow">&#8250;</div>
         </button>
 
@@ -916,6 +928,7 @@ select option{background:var(--surface);color:var(--txt)}
   </div>
 
   <div id="tc-berta-e" class="tc"><div class="main" id="berta-entry"></div></div>
+  <div id="tc-cc" class="tc"><div class="main" id="cc-main"></div></div>
   <div id="tc-berta"   class="tc"><div class="main" id="berta-dash"></div></div>
   <div id="tc-holly-e" class="tc"><div class="main" id="holly-entry"></div></div>
   <div id="tc-holly"   class="tc"><div class="main" id="holly-dash"></div></div>
@@ -1005,7 +1018,7 @@ const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets https://www.goog
 const MONTHS    = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DEMO      = false;
 const FREQS     = ['Monthly','Weekly','Bi-weekly','Every 2 months','Quarterly','Every 6 months','Annually','One-time'];
-const ACCT_TYPES = ['Checking','Savings','Credit','Debit','Investment','HSA','Other'];
+const ACCT_TYPES = ['Checking','Savings','Credit','CD','Debit','Investment','HSA','Other'];
 const ACCT_BANKS = ['Joint','Personal','Business'];
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -1024,13 +1037,43 @@ const setEl = (id,v) => { const e=document.getElementById(id); if(e) e.textConte
 const other = w => w==='holly' ? 'berta' : 'holly';
 
 function newRow()    { return {id:uid(),label:'',cost:0,isJoint:false,jointPct:50,frequency:'Monthly',dueDay:'',comment:'',website:'',vendor:'',jointKey:'',owner:''}; }
-function newAcct()   { return {id:uid(),name:'',bank:'Personal',type:'Checking',hasCard:false,creditDueDay:''}; }
+function newAcct()   { return {id:uid(),name:'',bank:'Personal',type:'Checking',hasCard:false,creditDueDay:'',cdTerm:'',cdMaturity:'',cdAutoRenew:false,isCreditCard:false}; }
 function newSavRow() { return {id:uid(),label:'',monthly:0,institution:'',notes:''}; }
 function newPerson(name) { return {name,paychecks:[],sections:[],accounts:[],savingsRows:[]}; }
+function newCC() {
+  return {
+    id:uid(),
+    // Basic
+    name:'', provider:'', last4:'', owner:'joint',
+    // Financial
+    limit:0, apr:0, annualFee:0, dueDay:'',
+    // Benefits — travel focus
+    signupBonus:'', signupSpend:0, signupDays:90,
+    travelCredit:0, travelCreditReset:'Annual',
+    loungeAccess:false, loungeNetwork:'',
+    globalEntryCredit:false, globalEntryCycle:4,
+    priorityPass:false,
+    hotelStatus:'', airlineStatus:'',
+    noForeignTxFee:false,
+    // Earn rates (pts or % per $1)
+    earnTravel:0, earnDining:0, earnGrocery:0, earnGas:0, earnOther:1,
+    ptValue:0.015,  // cents per point
+    rewardsType:'Points',  // Points | Miles | Cash Back
+    transferPartners:'',
+    // Yearly benefits tracker
+    yearlyBenefits:[],
+    // Notes / research
+    notes:'', considering:false, replaces:'',
+    // Meta
+    opened:'', closed:false,
+  };
+}
+function newYearlyBenefit(){ return {id:uid(),label:'',value:0,used:false,resetDate:''}; }
 
 let S = {
   user:null, token:null,
   sid: (typeof SHEET_ID !== 'undefined' && SHEET_ID !== 'YOUR_SHEET_ID') ? SHEET_ID : null,
+  creditCards: [],
   month: new Date().getMonth(), year: new Date().getFullYear(),
   calMonth: new Date().getMonth(), calYear: new Date().getFullYear(),
   myKey: null, dirty: false,
@@ -1272,6 +1315,7 @@ async function loadSheet() {
         const d=JSON.parse(val);
         if(who==='holly'){if(key==='paychecks')S.holly.paychecks=d;if(key==='sections')S.holly.sections=d;if(key==='accounts')S.holly.accounts=d;if(key==='savings')S.holly.savingsRows=d;}
         if(who==='berta'){if(key==='paychecks')S.berta.paychecks=d;if(key==='sections')S.berta.sections=d;if(key==='accounts')S.berta.accounts=d;if(key==='savings')S.berta.savingsRows=d;}
+        if(who==='shared'&&key==='creditCards')S.creditCards=d;
       } catch(e){}
     });
     if(!S.holly.sections.length&&!S.berta.sections.length) seedDefaults();
@@ -1309,6 +1353,7 @@ async function save() {
       [m,'sections', 'berta',JSON.stringify(S.berta.sections)],
       [m,'accounts', 'berta',JSON.stringify(S.berta.accounts)],
       [m,'savings',  'berta',JSON.stringify(S.berta.savingsRows)],
+      [m,'creditCards','shared',JSON.stringify(S.creditCards)],
     ];
     const final=kept.length?kept:[['month','key','who','value']];
     await req('/values/PawPenny!A:D?valueInputOption=RAW','PUT',
@@ -2206,9 +2251,9 @@ function buildAccountsSection(who){
   const hd=document.createElement('div');hd.style.cssText='background:var(--bg2);padding:11px 16px;font-size:13.5px;font-weight:700;color:var(--txt);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)';
   hd.innerHTML='<span>Cards &amp; Accounts</span><span style="font-size:11px;color:var(--txt3);font-weight:500">'+p.accounts.length+' account'+(p.accounts.length!==1?'s':'')+'</span>';
   wrap.appendChild(hd);
-  const ACOLS='1fr 80px 100px 80px 140px 22px';
+  const ACOLS='1fr 90px 110px auto 26px';
   const chd=document.createElement('div');chd.className='col-hd';chd.style.gridTemplateColumns=ACOLS;
-  chd.innerHTML='<div>Account Name</div><div style="text-align:center">Bank</div><div>Type</div><div style="text-align:center">Card</div><div style="text-align:center">CC Due Day</div><div></div>';
+  chd.innerHTML='<div>Account / Card Name</div><div>Bank</div><div>Type</div><div>Options</div><div></div>';
   wrap.appendChild(chd);
   const arw=document.createElement('div');arw.id='arw-'+who;
   p.accounts.forEach(a=>arw.appendChild(buildAcctRow(a,who)));
@@ -2219,47 +2264,68 @@ function buildAccountsSection(who){
   wrap.appendChild(addA);return wrap;
 }
 function buildAcctRow(a,who) {
-  const ACOLS = '1fr 80px 100px 80px 140px 22px';
-  const row = document.createElement('div'); row.id='ar-'+a.id;
-  row.className='acct-row'; row.style.gridTemplateColumns=ACOLS;
+  // Outer wrapper — full-width block, not a fixed grid
+  const wrap = document.createElement('div'); wrap.id='ar-'+a.id;
+  wrap.style.cssText='border-bottom:1.5px solid var(--border);transition:.12s';
+  wrap.onmouseenter=function(){this.style.background='var(--surface2)'};
+  wrap.onmouseleave=function(){this.style.background=''};
 
+  // Main row grid
+  const row = document.createElement('div');
+  row.style.cssText='display:grid;grid-template-columns:1fr 90px 110px auto 26px;gap:6px;align-items:center;padding:8px 12px';
+
+  // Name
   const nf = document.createElement('div'); nf.className='fi l';
-  const ni = document.createElement('input'); ni.type='text'; ni.value=a.name; ni.placeholder='Chase Checking...';
+  const ni = document.createElement('input'); ni.type='text'; ni.value=a.name; ni.placeholder='e.g. Chase Sapphire...';
   ni.oninput = function(){ updAcct(a.id,who,'name',this.value); }; nf.appendChild(ni);
 
+  // Bank
   const bf = document.createElement('div'); bf.className='fi';
-  const bs = document.createElement('select'); bs.style.cssText='text-align:left;font-size:12px;width:100%';
+  const bs = document.createElement('select'); bs.style.cssText='font-size:12px;width:100%';
   ACCT_BANKS.forEach(b=>{ const o=document.createElement('option'); o.value=b; o.textContent=b; if(a.bank===b) o.selected=true; bs.appendChild(o); });
   bs.onchange = function(){ updAcct(a.id,who,'bank',this.value); }; bf.appendChild(bs);
 
+  // Type
   const tf = document.createElement('div'); tf.className='fi';
-  const ts = document.createElement('select'); ts.style.cssText='text-align:left;font-size:12px;width:100%';
+  const ts = document.createElement('select'); ts.style.cssText='font-size:12px;width:100%';
   ACCT_TYPES.forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; if(a.type===t) o.selected=true; ts.appendChild(o); });
   ts.onchange = function(){ updAcctType(a.id,who,this.value); }; tf.appendChild(ts);
 
-  const ckw = document.createElement('div'); ckw.style.cssText='display:flex;justify-content:center';
-  const ckd = document.createElement('div'); ckd.className='ck-wrap';
-  const ck = document.createElement('input'); ck.type='checkbox'; ck.checked=a.hasCard;
-  ck.onchange = function(){ updAcct(a.id,who,'hasCard',this.checked); };
-  const cklbl = document.createElement('span'); cklbl.style.fontSize='11px'; cklbl.textContent='Yes';
-  ckd.appendChild(ck); ckd.appendChild(cklbl); ckw.appendChild(ckd);
+  // Toggles cell (CC tracker + has card)
+  const togCell = document.createElement('div'); togCell.style.cssText='display:flex;gap:10px;align-items:center;flex-wrap:wrap';
 
-  const dw = document.createElement('div'); dw.id='ccdue-wrap-'+a.id; dw.style.cssText='display:flex;justify-content:center';
-  if(a.type==='Credit') {
-    const df = document.createElement('div'); df.className='fi'; df.style.maxWidth='120px';
-    const di = document.createElement('input'); di.type='text'; di.value=a.creditDueDay||''; di.placeholder='e.g. 15'; di.style.textAlign='center';
-    di.oninput = function(){ updAcct(a.id,who,'creditDueDay',this.value); };
-    const ds = document.createElement('span'); ds.textContent='of mo.';
-    df.appendChild(di); df.appendChild(ds); dw.appendChild(df);
-  } else {
-    const na = document.createElement('span'); na.style.cssText='color:var(--txt4);font-size:12px'; na.textContent='N/A'; dw.appendChild(na);
-  }
+  // CC Tracker toggle (only shown when type=Credit)
+  const ccw = document.createElement('label'); ccw.id='cctog-wrap-'+a.id;
+  ccw.style.cssText='display:'+(a.type==='Credit'?'flex':'none')+';align-items:center;gap:5px;font-size:11.5px;color:var(--brand2);font-weight:700;cursor:pointer;white-space:nowrap;background:var(--brand-l);border-radius:20px;padding:3px 9px;';
+  const cctog = document.createElement('input'); cctog.type='checkbox'; cctog.checked=!!a.isCreditCard;
+  cctog.style.cssText='accent-color:var(--brand);width:13px;height:13px';
+  cctog.onchange = function(){
+    updAcct(a.id,who,'isCreditCard',this.checked);
+    renderCCTracker();
+  };
+  ccw.appendChild(cctog); ccw.appendChild(document.createTextNode('CC Tracker')); togCell.appendChild(ccw);
 
+  // Has card toggle
+  const hcw = document.createElement('label'); hcw.style.cssText='display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--txt3);font-weight:600;cursor:pointer;white-space:nowrap';
+  const hck = document.createElement('input'); hck.type='checkbox'; hck.checked=!!a.hasCard;
+  hck.style.cssText='accent-color:var(--brand);width:13px;height:13px';
+  hck.onchange = function(){ updAcct(a.id,who,'hasCard',this.checked); };
+  hcw.appendChild(hck); hcw.appendChild(document.createTextNode('Has Card')); togCell.appendChild(hcw);
+
+  // Delete
   const xb = document.createElement('button'); xb.className='xbtn'; xb.style.opacity='1'; xb.textContent='✕';
   xb.onclick = function(){ rmAcct(a.id,who); };
 
-  [nf,bf,tf,ckw,dw,xb].forEach(e=>row.appendChild(e));
-  return row;
+  [nf,bf,tf,togCell,xb].forEach(e=>row.appendChild(e));
+  wrap.appendChild(row);
+
+  // Extras row (CD fields or Credit due day) — full-width panel below
+  const extras = document.createElement('div'); extras.id='acxt-'+a.id;
+  extras.style.cssText='padding:0 12px 8px;display:none;flex-wrap:wrap;gap:8px;align-items:center';
+  wrap.appendChild(extras);
+  rebuildAcctExtras(a.id,who,a.type,a);
+
+  return wrap;
 }
 
 
@@ -2300,21 +2366,50 @@ function rmSav(id,who){S[who].savingsRows=S[who].savingsRows.filter(r=>r.id!==id
 function updAcct(id,who,f,v){const a=S[who].accounts.find(x=>x.id===id);if(!a)return;a[f]=v;dirty(true);}
 function updAcctType(id,who,v) {
   const a=S[who].accounts.find(x=>x.id===id); if(!a) return; a.type=v;
-  const wrap=document.getElementById('ccdue-wrap-'+id); if(!wrap) return;
-  wrap.innerHTML='';
-  if(v==='Credit') {
-    const df=document.createElement('div'); df.className='fi'; df.style.maxWidth='120px';
-    const di=document.createElement('input'); di.type='text'; di.value=a.creditDueDay||''; di.placeholder='e.g. 15'; di.style.textAlign='center';
-    di.oninput=function(){ updAcct(id,who,'creditDueDay',this.value); };
-    const ds=document.createElement('span'); ds.textContent='of mo.';
-    df.appendChild(di); df.appendChild(ds); wrap.appendChild(df);
-  } else {
-    const na=document.createElement('span'); na.style.cssText='color:var(--txt4);font-size:12px'; na.textContent='N/A'; wrap.appendChild(na);
-  }
+  // Toggle CC tracker flag off if not Credit type
+  if(v!=='Credit'){ a.isCreditCard=false; const ccw=document.getElementById('cctog-wrap-'+id); if(ccw) ccw.style.display='none'; }
+  else { const ccw=document.getElementById('cctog-wrap-'+id); if(ccw) ccw.style.display='flex'; }
+  // Rebuild the type-specific extras panel
+  rebuildAcctExtras(id,who,v,a);
   dirty(true);
 }
 
-function rmAcct(id,who){S[who].accounts=S[who].accounts.filter(a=>a.id!==id);const e=document.getElementById('ar-'+id);if(e)e.remove();dirty(true);}
+function rebuildAcctExtras(id,who,v,a) {
+  const wrap=document.getElementById('acxt-'+id); if(!wrap) return;
+  wrap.innerHTML=''; wrap.style.display='none';
+  if(v==='Credit') {
+    wrap.style.display='flex'; wrap.style.gap='6px'; wrap.style.alignItems='center';
+    const df=document.createElement('div'); df.className='fi'; df.style.maxWidth='110px';
+    const di=document.createElement('input'); di.type='text'; di.value=a.creditDueDay||''; di.placeholder='Due day'; di.style.textAlign='center';
+    di.oninput=function(){ updAcct(id,who,'creditDueDay',this.value); };
+    const ds=document.createElement('span'); ds.style.cssText='font-size:11px;color:var(--txt4);white-space:nowrap'; ds.textContent='of mo.';
+    df.appendChild(di); df.appendChild(ds); wrap.appendChild(df);
+  } else if(v==='CD') {
+    wrap.style.display='flex'; wrap.style.gap='6px'; wrap.style.alignItems='center'; wrap.style.flexWrap='wrap';
+    // Term select
+    const tf=document.createElement('div'); tf.className='fi';
+    const ts=document.createElement('select'); ts.style.cssText='font-size:12px;width:auto;min-width:100px';
+    [['','Term...'],['3','3 months'],['6','6 months'],['12','12 months']].forEach(([v2,l])=>{
+      const o=document.createElement('option'); o.value=v2; o.textContent=l; if((a.cdTerm||'')==v2) o.selected=true; ts.appendChild(o);
+    });
+    ts.onchange=function(){ updAcct(id,who,'cdTerm',this.value); };
+    tf.appendChild(ts);
+    // Maturity date
+    const mf=document.createElement('div'); mf.className='fi';
+    const mi=document.createElement('input'); mi.type='date'; mi.value=a.cdMaturity||''; mi.style.cssText='font-size:12px;width:130px';
+    const ml=document.createElement('span'); ml.style.cssText='font-size:11px;color:var(--txt4);white-space:nowrap;margin-right:4px'; ml.textContent='Matures';
+    mi.onchange=function(){ updAcct(id,who,'cdMaturity',this.value); };
+    mf.appendChild(ml); mf.appendChild(mi);
+    // Auto-renew toggle
+    const aw=document.createElement('label'); aw.style.cssText='display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--txt3);font-weight:600;cursor:pointer;white-space:nowrap';
+    const ac=document.createElement('input'); ac.type='checkbox'; ac.checked=!!a.cdAutoRenew; ac.style.cssText='accent-color:var(--brand);width:14px;height:14px';
+    ac.onchange=function(){ updAcct(id,who,'cdAutoRenew',this.checked); };
+    aw.appendChild(ac); aw.appendChild(document.createTextNode('Auto-Renew')); 
+    [tf,mf,aw].forEach(e=>wrap.appendChild(e));
+  }
+}
+
+function rmAcct(id,who){S[who].accounts=S[who].accounts.filter(a=>a.id!==id);const e=document.getElementById('ar-'+id);if(e)e.remove();renderCCTracker();dirty(true);}
 function updateEbar(who){const p=S[who],net=netInc(p),exp=totalExp(p,who),sav=totalSav(p),left=net-exp-totalSavOOC(p);const e=document.getElementById(who+'-ebar');if(e)e.innerHTML='<div class="es"><div class="es-lbl">Net Income</div><div class="es-val">'+fmt(net)+'</div></div><div class="es-div"></div><div class="es"><div class="es-lbl">Expenses</div><div class="es-val">'+fmt(exp)+'</div></div><div class="es-div"></div><div class="es"><div class="es-lbl">Savings</div><div class="es-val">'+fmt(totalSavOOC(p))+'</div></div><div class="es-div"></div><div class="es"><div class="es-lbl">401k</div><div class="es-val">'+fmt(get401k(p))+'</div></div><div class="es-div"></div><div class="es"><div class="es-lbl">Left Over</div><div class="es-val">'+fmt(left)+'</div></div>';}
 
 function renderCal(){
@@ -2374,12 +2469,12 @@ function go(n){
   ['mn-home','mn-joint','mn-holly-e','mn-berta-e','mn-more'].forEach(b=>{
     const el=document.getElementById(b); if(el) el.classList.remove('mob-active');
   });
-  const mobMap={home:'mn-home',joint:'mn-joint','holly-e':'mn-holly-e','berta-e':'mn-berta-e',
+  const mobMap={home:'mn-home',joint:'mn-joint','holly-e':'mn-holly-e','berta-e':'mn-berta-e',cc:'mn-more',
                 holly:'mn-more',berta:'mn-more',cal:'mn-more'};
   const mobBtn=document.getElementById(mobMap[n]||'');
   if(mobBtn) mobBtn.classList.add('mob-active');
   closeMobMore();
-  const m={home:function(){},joint:renderJoint,holly:function(){renderDash('holly');},berta:function(){renderDash('berta');},'holly-e':function(){renderEntry('holly');},'berta-e':function(){renderEntry('berta');},cal:renderCal};
+  const m={home:function(){},joint:renderJoint,holly:function(){renderDash('holly');},berta:function(){renderDash('berta');},'holly-e':function(){renderEntry('holly');},'berta-e':function(){renderEntry('berta');},cal:renderCal,cc:renderCCTracker};
   if(m[n])m[n]();
 }
 function mobMore(){
@@ -2535,6 +2630,334 @@ function rebuildCategorySelects(who){
   });
 }
 
+// ══════════════════════════════════════════════════════════
+//  CREDIT CARD TRACKER
+// ══════════════════════════════════════════════════════════
+
+function getAllCCAccounts() {
+  // All accounts flagged as isCreditCard, from both people
+  const cards = [];
+  ['holly','berta'].forEach(who => {
+    S[who].accounts.filter(a=>a.isCreditCard).forEach(a => {
+      cards.push({acct:a, who});
+    });
+  });
+  return cards;
+}
+
+function syncCCFromAccounts() {
+  // Ensure every flagged account has a matching CC record
+  getAllCCAccounts().forEach(({acct,who}) => {
+    let cc = S.creditCards.find(c=>c.acctId===acct.id);
+    if(!cc) {
+      cc = newCC();
+      cc.acctId = acct.id;
+      cc.name = acct.name || '';
+      cc.owner = who;
+      S.creditCards.push(cc);
+    }
+    // Sync name from account
+    cc.name = acct.name || cc.name;
+    cc.owner = who;
+  });
+  // Remove CC records whose account no longer exists or is unflagged
+  const validIds = getAllCCAccounts().map(x=>x.acct.id);
+  S.creditCards = S.creditCards.filter(c=>validIds.includes(c.acctId));
+}
+
+function updCC(id,f,v){ const c=S.creditCards.find(x=>x.id===id); if(!c)return; c[f]=v; dirty(true); }
+
+function renderCCTracker() {
+  syncCCFromAccounts();
+  const el = document.getElementById('cc-main'); if(!el) return;
+  el.innerHTML='';
+
+  // Page title
+  const pt = document.createElement('div'); pt.className='pg-title';
+  pt.innerHTML='<div><div class="pg-title-name">Credit Card Tracker</div><div class="pg-title-sub">Benefits, rewards &amp; travel perks</div></div>';
+  el.appendChild(pt);
+
+  const cards = S.creditCards;
+
+  if(!cards.length) {
+    // Empty state
+    const emp = document.createElement('div');
+    emp.style.cssText='text-align:center;padding:60px 24px;color:var(--txt4)';
+    emp.innerHTML='<div style="font-size:40px;margin-bottom:16px">💳</div>'
+      +'<div style="font-size:17px;font-weight:700;color:var(--txt2);margin-bottom:8px">No credit cards yet</div>'
+      +'<div style="font-size:13px;line-height:1.7;max-width:340px;margin:0 auto">Go to Holly or Berta\'s Entry tab, add an account with type <strong>Credit</strong>, then toggle <strong>CC Tracker</strong> to add it here.</div>';
+    el.appendChild(emp);
+    return;
+  }
+
+  // Summary bar
+  const totalLimit = cards.reduce((s,c)=>s+(+c.limit||0),0);
+  const totalFees  = cards.reduce((s,c)=>s+(+c.annualFee||0),0);
+  const totalTC    = cards.reduce((s,c)=>s+(+c.travelCredit||0),0);
+  const netCost    = totalFees - totalTC;
+  const sumBar = document.createElement('div');
+  sumBar.style.cssText='display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px';
+  const sCards = [
+    {lbl:'Total Credit Limit',val:'$'+totalLimit.toLocaleString(),color:'var(--brand)'},
+    {lbl:'Total Annual Fees',val:'$'+totalFees.toLocaleString(),color:'var(--warn)'},
+    {lbl:'Total Travel Credits',val:'$'+totalTC.toLocaleString(),color:'var(--pos)'},
+    {lbl:'Net Annual Cost',val:(netCost<=0?'-$'+Math.abs(netCost).toLocaleString():'$'+netCost.toLocaleString()),color:netCost<=0?'var(--pos)':'var(--neg)'},
+  ];
+  sCards.forEach(sc=>{
+    const c=document.createElement('div'); c.className='card';
+    c.innerHTML='<div class="c-bar" style="background:'+sc.color+'"></div>'
+      +'<div class="c-lbl">'+sc.lbl+'</div>'
+      +'<div class="c-val" style="color:'+sc.color+';font-size:22px">'+sc.val+'</div>';
+    sumBar.appendChild(c);
+  });
+  el.appendChild(sumBar);
+
+  // "Add new card" button (for considering cards)
+  const addBtn = document.createElement('button');
+  addBtn.style.cssText='margin-bottom:16px;padding:9px 20px;background:var(--brand-l);color:var(--brand2);border:1.5px solid rgba(78,124,95,.3);border-radius:var(--rxx);font-size:13px;font-weight:700;cursor:pointer;transition:.15s';
+  addBtn.textContent='+ Add Research Card';
+  addBtn.onclick=()=>{ 
+    const cc=newCC(); cc.considering=true; cc.acctId='research-'+cc.id;
+    S.creditCards.push(cc); renderCCTracker(); dirty(true);
+  };
+  el.appendChild(addBtn);
+
+  // Card panels
+  cards.forEach(cc => buildCCPanel(cc, el));
+}
+
+function buildCCPanel(cc, container) {
+  const isResearch = cc.considering;
+  const panel = document.createElement('div');
+  panel.id='cc-panel-'+cc.id;
+  panel.style.cssText='background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden;box-shadow:var(--sh)';
+
+  // ── Panel header ──
+  const hd = document.createElement('div');
+  hd.style.cssText='display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;user-select:none;transition:.13s;border-bottom:1.5px solid var(--border)';
+  hd.onmouseenter=function(){this.style.background='var(--surface2)'};
+  hd.onmouseleave=function(){this.style.background=''};
+
+  // Color accent
+  const accentColor = isResearch ? 'var(--txt4)' : (cc.owner==='holly'?'var(--holly)':'var(--berta)');
+  const accent = document.createElement('div');
+  accent.style.cssText='width:4px;height:36px;border-radius:4px;background:'+accentColor+';flex-shrink:0';
+
+  // Card name & meta
+  const namePart = document.createElement('div'); namePart.style.flex='1';
+  const nameEl = document.createElement('div'); nameEl.style.cssText='font-size:15px;font-weight:800;letter-spacing:-.025em;color:var(--txt)';
+  nameEl.textContent = cc.name || 'Unnamed Card';
+  const metaEl = document.createElement('div'); metaEl.style.cssText='font-size:11.5px;color:var(--txt4);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap';
+
+  const metaParts = [];
+  if(cc.provider) metaParts.push(cc.provider);
+  if(cc.last4) metaParts.push('···'+cc.last4);
+  if(cc.limit) metaParts.push('Limit: $'+(+cc.limit).toLocaleString());
+  if(cc.apr) metaParts.push('APR: '+cc.apr+'%');
+  if(cc.annualFee) metaParts.push('Fee: $'+cc.annualFee+'/yr');
+  if(cc.dueDay) metaParts.push('Due: '+cc.dueDay+'th');
+  metaEl.textContent = metaParts.join('  ·  ') || (isResearch?'Research card — not yet owned':'Click to expand');
+
+  namePart.appendChild(nameEl); namePart.appendChild(metaEl);
+
+  // Badges
+  const badges = document.createElement('div'); badges.style.cssText='display:flex;gap:6px;align-items:center;flex-wrap:wrap';
+  if(isResearch) {
+    const b=document.createElement('span'); b.style.cssText='background:var(--warn-l);color:var(--warn);font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:20px'; b.textContent='Researching'; badges.appendChild(b);
+  }
+  if(cc.noForeignTxFee) { const b=document.createElement('span'); b.style.cssText='background:var(--brand-l);color:var(--brand2);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px'; b.textContent='No FX Fee'; badges.appendChild(b); }
+  if(cc.loungeAccess)   { const b=document.createElement('span'); b.style.cssText='background:var(--holly-l);color:var(--holly2);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px'; b.textContent='Lounge ✓'; badges.appendChild(b); }
+  if(cc.travelCredit>0) { const b=document.createElement('span'); b.style.cssText='background:var(--pos-l);color:var(--pos2);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px'; b.textContent='$'+cc.travelCredit+' Credit'; badges.appendChild(b); }
+
+  // Expand chevron
+  const chev = document.createElement('span'); chev.style.cssText='color:var(--txt4);font-size:14px;transition:.2s';
+  chev.textContent = '▾';
+
+  [accent,namePart,badges,chev].forEach(e=>hd.appendChild(e));
+  panel.appendChild(hd);
+
+  // ── Expandable body ──
+  const body = document.createElement('div');
+  body.id='ccb-'+cc.id;
+  body.style.cssText='padding:18px 16px;display:none';
+  buildCCBody(cc, body);
+  panel.appendChild(body);
+
+  // Toggle expand
+  let open = false;
+  hd.onclick=function(){
+    open=!open; body.style.display=open?'block':'none'; chev.style.transform=open?'rotate(180deg)':'';
+  };
+
+  container.appendChild(panel);
+}
+
+function fi2(lbl,val,inp,extraStyle){
+  const w=document.createElement('div'); w.style.cssText='display:flex;flex-direction:column;gap:4px;'+(extraStyle||'');
+  const l=document.createElement('label'); l.style.cssText='font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--txt4)'; l.textContent=lbl;
+  inp.style.cssText=(inp.style.cssText||'')+'background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:6px 10px;color:var(--txt);font-size:13px;font-family:inherit;outline:none;transition:.15s;width:100%';
+  inp.onfocus=function(){this.style.borderColor='var(--brand)';this.style.boxShadow='0 0 0 3px var(--brand-l)'};
+  inp.onblur=function(){this.style.borderColor='var(--border)';this.style.boxShadow=''};
+  w.appendChild(l); w.appendChild(inp); return w;
+}
+
+function fToggle(lbl,checked,onChange){
+  const w=document.createElement('label'); w.style.cssText='display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--txt2)';
+  const ck=document.createElement('input'); ck.type='checkbox'; ck.checked=!!checked; ck.style.cssText='accent-color:var(--brand);width:15px;height:15px';
+  ck.onchange=function(){onChange(this.checked)};
+  w.appendChild(ck); w.appendChild(document.createTextNode(lbl)); return w;
+}
+
+function fRow(...items){
+  const r=document.createElement('div'); r.style.cssText='display:grid;gap:10px;margin-bottom:12px';
+  r.style.gridTemplateColumns='repeat('+items.length+',1fr)';
+  items.forEach(i=>r.appendChild(i)); return r;
+}
+
+function sectionHd(txt){
+  const d=document.createElement('div');
+  d.style.cssText='font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--txt4);margin:18px 0 10px;padding-bottom:7px;border-bottom:1.5px solid var(--border)';
+  d.textContent=txt; return d;
+}
+
+function buildCCBody(cc, body){
+  const mk=(tag,css)=>{ const e=document.createElement(tag); if(css) e.style.cssText=css; return e; };
+  const inp=(v,ph,type='text')=>{ const i=document.createElement('input'); i.type=type; i.value=v||''; i.placeholder=ph||''; return i; };
+  const sel=(opts,cur)=>{ const s=document.createElement('select'); opts.forEach(([v,l])=>{const o=document.createElement('option');o.value=v;o.textContent=l;if(cur==v)o.selected=true;s.appendChild(o);}); return s; };
+
+  // ── Basics ──
+  body.appendChild(sectionHd('Card Basics'));
+  const iName=inp(cc.name,'Chase Sapphire Reserve');     iName.oninput=e=>{ updCC(cc.id,'name',e.target.value); document.querySelector('#cc-panel-'+cc.id+' div')?.querySelector('div')?.querySelector('div')?.textContent; syncCCPanelName(cc.id,e.target.value); };
+  const iProv=inp(cc.provider,'e.g. Chase, Amex, Citi'); iProv.oninput=e=>updCC(cc.id,'provider',e.target.value);
+  const iLast=inp(cc.last4,'4 digits'); iLast.maxLength=4;           iLast.oninput=e=>updCC(cc.id,'last4',e.target.value);
+  const sOwner=sel([['joint','Joint'],['holly','Holly'],['berta','Berta']],cc.owner); sOwner.onchange=e=>updCC(cc.id,'owner',e.target.value);
+  const iOpened=inp(cc.opened,'','date');                             iOpened.onchange=e=>updCC(cc.id,'opened',e.target.value);
+  body.appendChild(fRow(fi2('Card Name',cc.name,iName),fi2('Provider',cc.provider,iProv),fi2('Last 4',cc.last4,iLast)));
+  body.appendChild(fRow(fi2('Owner',cc.owner,sOwner),fi2('Date Opened',cc.opened,iOpened)));
+
+  // ── Financials ──
+  body.appendChild(sectionHd('Financials'));
+  const iLim=inp(cc.limit||'','0','number');   iLim.oninput=e=>updCC(cc.id,'limit',+e.target.value);
+  const iAPR=inp(cc.apr||'','e.g. 21.99');     iAPR.oninput=e=>updCC(cc.id,'apr',e.target.value);
+  const iFee=inp(cc.annualFee||'','0','number');iFee.oninput=e=>updCC(cc.id,'annualFee',+e.target.value);
+  const iDue=inp(cc.dueDay||'','e.g. 15');      iDue.oninput=e=>updCC(cc.id,'dueDay',e.target.value);
+  body.appendChild(fRow(fi2('Credit Limit ($)',cc.limit,iLim),fi2('APR (%)',cc.apr,iAPR),fi2('Annual Fee ($)',cc.annualFee,iFee),fi2('Due Day',cc.dueDay,iDue)));
+
+  // ── Signup Bonus ──
+  body.appendChild(sectionHd('Signup Bonus'));
+  const iSB=inp(cc.signupBonus,'e.g. 60,000 pts after $4k spend');   iSB.oninput=e=>updCC(cc.id,'signupBonus',e.target.value);
+  const iSSp=inp(cc.signupSpend||'','spend req $','number');          iSSp.oninput=e=>updCC(cc.id,'signupSpend',+e.target.value);
+  const iSDy=inp(cc.signupDays||90,'days','number');                  iSDy.oninput=e=>updCC(cc.id,'signupDays',+e.target.value);
+  body.appendChild(fRow(fi2('Bonus Description',cc.signupBonus,iSB),fi2('Spend Required ($)',cc.signupSpend,iSSp),fi2('Days to Meet',cc.signupDays,iSDy)));
+
+  // ── Travel Benefits ──
+  body.appendChild(sectionHd('Travel Benefits'));
+  const iTC=inp(cc.travelCredit||'','0','number');    iTC.oninput=e=>updCC(cc.id,'travelCredit',+e.target.value);
+  const sTCR=sel([['Annual','Annual'],['Calendar Year','Cal. Year'],['Card Year','Card Year']],cc.travelCreditReset); sTCR.onchange=e=>updCC(cc.id,'travelCreditReset',e.target.value);
+  const iLN=inp(cc.loungeNetwork,'Priority Pass, Centurion...');       iLN.oninput=e=>updCC(cc.id,'loungeNetwork',e.target.value);
+  const iGEC=inp(cc.globalEntryCycle||4,'cycle yrs','number');         iGEC.oninput=e=>updCC(cc.id,'globalEntryCycle',+e.target.value);
+  const iHotel=inp(cc.hotelStatus,'e.g. Gold, Platinum');              iHotel.oninput=e=>updCC(cc.id,'hotelStatus',e.target.value);
+  const iAirline=inp(cc.airlineStatus,'e.g. Silver, Gold');            iAirline.oninput=e=>updCC(cc.id,'airlineStatus',e.target.value);
+  const iTP=inp(cc.transferPartners,'United, Hyatt, BA...');           iTP.oninput=e=>updCC(cc.id,'transferPartners',e.target.value);
+  body.appendChild(fRow(fi2('Annual Travel Credit ($)',cc.travelCredit,iTC),fi2('Credit Resets',cc.travelCreditReset,sTCR)));
+  const togRow=mk('div','display:flex;gap:20px;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;background:var(--surface2);border-radius:var(--rs)');
+  togRow.appendChild(fToggle('Lounge Access',cc.loungeAccess,v=>updCC(cc.id,'loungeAccess',v)));
+  togRow.appendChild(fToggle('Priority Pass',cc.priorityPass,v=>updCC(cc.id,'priorityPass',v)));
+  togRow.appendChild(fToggle('Global Entry / TSA Credit',cc.globalEntryCredit,v=>updCC(cc.id,'globalEntryCredit',v)));
+  togRow.appendChild(fToggle('No Foreign Transaction Fee',cc.noForeignTxFee,v=>updCC(cc.id,'noForeignTxFee',v)));
+  body.appendChild(togRow);
+  body.appendChild(fRow(fi2('Lounge Network',cc.loungeNetwork,iLN),fi2('Global Entry Cycle (yrs)',cc.globalEntryCycle,iGEC)));
+  body.appendChild(fRow(fi2('Hotel Status',cc.hotelStatus,iHotel),fi2('Airline Status',cc.airlineStatus,iAirline)));
+  body.appendChild(fRow(fi2('Transfer Partners',cc.transferPartners,iTP)));
+
+  // ── Earn Rates ──
+  body.appendChild(sectionHd('Earn Rates'));
+  const sRT=sel([['Points','Points'],['Miles','Miles'],['Cash Back','Cash Back']],cc.rewardsType); sRT.onchange=e=>updCC(cc.id,'rewardsType',e.target.value);
+  const iPV=inp(cc.ptValue||0.015,'cents/pt'); iPV.oninput=e=>updCC(cc.id,'ptValue',+e.target.value);
+  const iET=inp(cc.earnTravel||'','pts per $1','number');    iET.oninput=e=>updCC(cc.id,'earnTravel',+e.target.value);
+  const iED=inp(cc.earnDining||'','pts per $1','number');    iED.oninput=e=>updCC(cc.id,'earnDining',+e.target.value);
+  const iEG=inp(cc.earnGrocery||'','pts per $1','number');   iEG.oninput=e=>updCC(cc.id,'earnGrocery',+e.target.value);
+  const iEGa=inp(cc.earnGas||'','pts per $1','number');      iEGa.oninput=e=>updCC(cc.id,'earnGas',+e.target.value);
+  const iEO=inp(cc.earnOther||1,'pts per $1','number');      iEO.oninput=e=>updCC(cc.id,'earnOther',+e.target.value);
+  body.appendChild(fRow(fi2('Rewards Type',cc.rewardsType,sRT),fi2('Point Value (¢)',cc.ptValue,iPV)));
+  body.appendChild(fRow(fi2('Travel',cc.earnTravel,iET),fi2('Dining',cc.earnDining,iED),fi2('Grocery',cc.earnGrocery,iEG),fi2('Gas',cc.earnGas,iEGa),fi2('All Other',cc.earnOther,iEO)));
+
+  // ── Yearly Benefits Tracker ──
+  body.appendChild(sectionHd('Yearly Benefits Tracker'));
+  const bList=mk('div','margin-bottom:10px'); bList.id='ccyb-'+cc.id;
+  (cc.yearlyBenefits||[]).forEach(b=>bList.appendChild(buildYBRow(cc.id,b)));
+  const addYB=document.createElement('button');
+  addYB.style.cssText='padding:7px 14px;background:var(--brand-l);color:var(--brand2);border:1.5px solid rgba(78,124,95,.25);border-radius:var(--rxx);font-size:12px;font-weight:700;cursor:pointer;transition:.15s';
+  addYB.textContent='+ Add Benefit';
+  addYB.onclick=()=>{ const b=newYearlyBenefit(); cc.yearlyBenefits=cc.yearlyBenefits||[]; cc.yearlyBenefits.push(b); bList.appendChild(buildYBRow(cc.id,b)); dirty(true); };
+  body.appendChild(bList); body.appendChild(addYB);
+
+  // ── Notes / Research ──
+  body.appendChild(sectionHd('Notes & Research'));
+  const togRow2=mk('div','display:flex;gap:20px;flex-wrap:wrap;margin-bottom:12px');
+  togRow2.appendChild(fToggle('Researching / Considering',cc.considering,v=>updCC(cc.id,'considering',v)));
+  togRow2.appendChild(fToggle('Card Closed',cc.closed,v=>updCC(cc.id,'closed',v)));
+  body.appendChild(togRow2);
+  const iRepl=inp(cc.replaces,'Replaces which card?'); iRepl.oninput=e=>updCC(cc.id,'replaces',e.target.value);
+  body.appendChild(fRow(fi2('Replaces Card',cc.replaces,iRepl)));
+  const taNotes=document.createElement('textarea');
+  taNotes.value=cc.notes||''; taNotes.placeholder='Research notes, pros/cons, links...';
+  taNotes.style.cssText='width:100%;min-height:80px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--txt);resize:vertical;outline:none;transition:.15s;font-family:inherit';
+  taNotes.onfocus=function(){this.style.borderColor='var(--brand)'};
+  taNotes.onblur=function(){this.style.borderColor='var(--border)'};
+  taNotes.oninput=function(){updCC(cc.id,'notes',this.value)};
+  const notesWrap=mk('div','margin-bottom:12px'); 
+  const notesLbl=mk('div','font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--txt4);margin-bottom:6px'); notesLbl.textContent='Notes';
+  notesWrap.appendChild(notesLbl); notesWrap.appendChild(taNotes);
+  body.appendChild(notesWrap);
+
+  // Delete card (research cards only shown; owned cards removed via Account toggle)
+  if(cc.considering) {
+    const delBtn=document.createElement('button');
+    delBtn.style.cssText='padding:8px 18px;background:var(--neg-l);color:var(--neg);border:1.5px solid rgba(168,58,58,.2);border-radius:var(--rxx);font-size:12px;font-weight:700;cursor:pointer;margin-top:8px';
+    delBtn.textContent='Remove Research Card';
+    delBtn.onclick=()=>{ S.creditCards=S.creditCards.filter(c=>c.id!==cc.id); renderCCTracker(); dirty(true); };
+    body.appendChild(delBtn);
+  }
+}
+
+function buildYBRow(ccId,b){
+  const row=document.createElement('div');
+  row.id='yb-'+b.id;
+  row.style.cssText='display:grid;grid-template-columns:1fr 90px 110px 26px;gap:6px;align-items:center;padding:6px 0';
+  const ni=document.createElement('input'); ni.type='text'; ni.value=b.label||''; ni.placeholder='e.g. $300 travel credit, Global Entry fee...';
+  ni.style.cssText='background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:5px 9px;font-size:13px;color:var(--txt);outline:none;width:100%;transition:.15s;font-family:inherit';
+  ni.onfocus=function(){this.style.borderColor='var(--brand)'};
+  ni.onblur=function(){this.style.borderColor='var(--border)'};
+  ni.oninput=function(){ b.label=this.value; dirty(true); };
+  const vi=document.createElement('input'); vi.type='number'; vi.value=b.value||0; vi.placeholder='Value $';
+  vi.style.cssText='background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:5px 9px;font-size:13px;color:var(--txt);outline:none;width:100%;transition:.15s;text-align:right;font-family:inherit';
+  vi.onfocus=function(){this.style.borderColor='var(--brand)'};
+  vi.onblur=function(){this.style.borderColor='var(--border)'};
+  vi.oninput=function(){ b.value=+this.value; dirty(true); };
+  const ul=document.createElement('label'); ul.style.cssText='display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--txt3);cursor:pointer;white-space:nowrap';
+  const uc=document.createElement('input'); uc.type='checkbox'; uc.checked=!!b.used; uc.style.cssText='accent-color:var(--pos);width:14px;height:14px';
+  uc.onchange=function(){ b.used=this.checked; dirty(true); ul.style.textDecoration=this.checked?'line-through':''; };
+  if(b.used) ul.style.textDecoration='line-through';
+  ul.appendChild(uc); ul.appendChild(document.createTextNode('Used this year'));
+  const xb=document.createElement('button'); xb.className='xbtn'; xb.style.opacity='1'; xb.textContent='✕';
+  xb.onclick=function(){
+    const cc=S.creditCards.find(c=>c.id===ccId); if(!cc) return;
+    cc.yearlyBenefits=cc.yearlyBenefits.filter(x=>x.id!==b.id);
+    document.getElementById('yb-'+b.id)?.remove(); dirty(true);
+  };
+  [ni,vi,ul,xb].forEach(e=>row.appendChild(e));
+  return row;
+}
+
+function syncCCPanelName(ccId,name){
+  const panel=document.getElementById('cc-panel-'+ccId); if(!panel) return;
+  const hd=panel.querySelector('div');
+  if(!hd) return;
+  // Find the name div (3rd child of header: accent, namePart, badges, chev)
+  const namePart=hd.children[1]; if(!namePart) return;
+  const nameEl=namePart.querySelector('div'); if(nameEl) nameEl.textContent=name||'Unnamed Card';
+}
 </script>
 
 <!-- MOBILE BOTTOM NAV -->
@@ -2566,6 +2989,7 @@ function rebuildCategorySelects(who){
   <button onclick="go('holly');closeMobMore()">Holly — Dashboard</button>
   <button onclick="go('berta');closeMobMore()">Berta — Dashboard</button>
   <button onclick="go('cal');closeMobMore()">Calendar</button>
+  <button onclick="go('cc');closeMobMore()" style="color:var(--warn);font-weight:700">💳 Credit Cards</button>
   <button onclick="signOut();closeMobMore()" style="color:var(--neg)">Sign Out</button>
 </div>
 
